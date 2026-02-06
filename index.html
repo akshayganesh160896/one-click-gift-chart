@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght;400;500;600;700&family=Space+Grotesk:wght;500;600&family=Work+Sans:wght;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     /* ================================
        THEME + GLOBAL BASE STYLES
@@ -258,6 +259,20 @@
       margin: 10px 0 16px 0;
     }
     .filters-inline .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .filters-inline .full {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .export-btn {
+      background: #e6fffa;
+      color: #0f5d52;
+      border: 1px solid var(--line);
+      font-weight: 600;
+      white-space: nowrap;
+    }
 
     .weights {
       display: grid;
@@ -434,6 +449,10 @@
             <div>
               <label for="filter-score">Min score</label>
               <input id="filter-score" type="number" min="1" max="5" step="0.1" placeholder="3" />
+            </div>
+            <div class="full">
+              <span class="pill">Download reflects current filters</span>
+              <button id="export-excel" class="export-btn">Download Excel</button>
             </div>
           </div>
           <div class="chart-wrap">
@@ -984,6 +1003,90 @@
       }
       refresh();
     });
+
+    // ================================
+    // EXPORT TO EXCEL (LIVE DATA)
+    // ================================
+    // Exports full dataset + current filtered view + chart data table
+    function exportToExcel() {
+      const allProjects = flattenProjects();
+      const filteredProjects = applyFilters(allProjects);
+      const { wU, wC, wH } = getWeights();
+
+      const pillars = state.pillars.map((p) => ({
+        Pillar: p.name,
+        Objectives: p.objectives.length
+      }));
+
+      const objectives = [];
+      const projects = [];
+      for (const pillar of state.pillars) {
+        for (const objective of pillar.objectives) {
+          objectives.push({
+            Pillar: pillar.name,
+            Objective: objective.name,
+            Projects: objective.projects.length
+          });
+          for (const project of objective.projects) {
+            projects.push({
+              Pillar: pillar.name,
+              Objective: objective.name,
+              Project: project.name,
+              Budget: project.budget,
+              Urgency: project.urgency,
+              Complexity: project.complexity,
+              Hours: project.hours,
+              StrategicScore: computeScore(project)
+            });
+          }
+        }
+      }
+
+      const dashboard = [
+        { Metric: "Total Projects", Value: filteredProjects.length },
+        { Metric: "Total Budget", Value: filteredProjects.reduce((s, p) => s + p.budget, 0) },
+        { Metric: "Avg Strategic Score", Value: filteredProjects.length
+            ? (filteredProjects.reduce((s, p) => s + p.score, 0) / filteredProjects.length).toFixed(1)
+            : "0.0"
+        },
+        { Metric: "Weight - Urgency", Value: wU.toFixed(2) },
+        { Metric: "Weight - Complexity", Value: wC.toFixed(2) },
+        { Metric: "Weight - Hours", Value: wH.toFixed(2) },
+        { Metric: "Exported At", Value: new Date().toLocaleString() }
+      ];
+
+      const filteredView = filteredProjects.map((p) => ({
+        Pillar: p.pillar,
+        Objective: p.objective,
+        Project: p.name,
+        Budget: p.budget,
+        Urgency: p.urgency,
+        Complexity: p.complexity,
+        Hours: p.hours,
+        StrategicScore: p.score
+      }));
+
+      // Chart data sheet can be used to build an Excel bubble chart
+      const chartData = filteredProjects.map((p) => ({
+        Project: p.name,
+        Urgency: p.urgency,
+        Complexity: p.complexity,
+        Budget: p.budget,
+        StrategicScore: p.score
+      }));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pillars), "Pillars");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(objectives), "Objectives");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(projects), "Projects");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filteredView), "Filtered View");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(chartData), "Chart Data");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dashboard), "Dashboard");
+
+      XLSX.writeFile(wb, "strategic-planning-export.xlsx");
+    }
+
+    document.getElementById("export-excel").addEventListener("click", exportToExcel);
 
     // ================================
     // INITIAL RENDER
