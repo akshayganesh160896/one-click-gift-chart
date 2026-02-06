@@ -327,7 +327,7 @@
         <h2>Add Pillar</h2>
         <div>
           <label for="pillar-name">Pillar name</label>
-          <input id="pillar-name" placeholder="Growth, Innovation, People" />
+          <input id="pillar-name" placeholder="Mission Impact, Fundraising, Operations" />
         </div>
         <button id="add-pillar">Add Pillar</button>
       </div>
@@ -337,7 +337,7 @@
         <h2>Add Objective</h2>
         <div>
           <label for="objective-name">Objective name</label>
-          <input id="objective-name" placeholder="Expand market share" />
+          <input id="objective-name" placeholder="Grow monthly donor base" />
         </div>
         <div>
           <label for="objective-pillar">Under pillar</label>
@@ -351,7 +351,7 @@
         <h2>Add Project</h2>
         <div>
           <label for="project-name">Project name</label>
-          <input id="project-name" placeholder="Launch new product" />
+          <input id="project-name" placeholder="Gala sponsorship outreach" />
         </div>
         <div>
           <label for="project-objective">Under objective</label>
@@ -478,28 +478,49 @@
       pillars: [
         {
           id: "p1",
-          name: "Growth",
+          name: "Mission Impact",
           objectives: [
             {
               id: "o1",
-              name: "Expand Market Share",
+              name: "Expand Program Reach",
               projects: [
-                { id: "pr1", name: "Launch LATAM", budget: 420000, urgency: 4, complexity: 3, hours: 3 },
-                { id: "pr2", name: "New Partner Program", budget: 260000, urgency: 3, complexity: 2, hours: 2 }
+                { id: "pr1", name: "Mobile Clinic Expansion", budget: 420000, urgency: 5, complexity: 4, hours: 4 },
+                { id: "pr2", name: "Community Partner Network", budget: 260000, urgency: 4, complexity: 3, hours: 3 }
               ]
             }
           ]
         },
         {
           id: "p2",
-          name: "Innovation",
+          name: "Fundraising",
           objectives: [
             {
               id: "o2",
-              name: "Modernize Platform",
+              name: "Grow Recurring Donors",
               projects: [
-                { id: "pr3", name: "AI Forecasting", budget: 750000, urgency: 5, complexity: 4, hours: 4 },
-                { id: "pr4", name: "Data Lake", budget: 620000, urgency: 4, complexity: 5, hours: 5 }
+                { id: "pr3", name: "Monthly Giving Campaign", budget: 180000, urgency: 4, complexity: 2, hours: 3 },
+                { id: "pr4", name: "Major Gifts Pipeline", budget: 300000, urgency: 5, complexity: 4, hours: 4 }
+              ]
+            },
+            {
+              id: "o3",
+              name: "Diversify Revenue Streams",
+              projects: [
+                { id: "pr5", name: "Corporate Sponsorship Program", budget: 220000, urgency: 3, complexity: 3, hours: 3 }
+              ]
+            }
+          ]
+        },
+        {
+          id: "p3",
+          name: "Operations & Stewardship",
+          objectives: [
+            {
+              id: "o4",
+              name: "Improve Donor Experience",
+              projects: [
+                { id: "pr6", name: "CRM Data Cleanup", budget: 95000, urgency: 3, complexity: 2, hours: 2 },
+                { id: "pr7", name: "Donor Impact Reporting", budget: 140000, urgency: 4, complexity: 3, hours: 3 }
               ]
             }
           ]
