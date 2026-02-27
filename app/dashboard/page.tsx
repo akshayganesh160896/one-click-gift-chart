@@ -18,7 +18,7 @@ export default async function DashboardPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">One Click Gift Chart</h1>
-          <p className="text-slate-600">Build and manage capital campaign gift charts.</p>
+          <p className="text-slate-600">Click to Build.</p>
         </div>
         <Link href="/" className="text-sm font-medium text-slate-600 underline underline-offset-4">
           Home
@@ -63,6 +63,7 @@ export default async function DashboardPage() {
         </div>
         {charts.length === 0 ? <p className="mt-4 text-sm text-slate-500">No charts yet.</p> : null}
       </section>
+      <p className="pt-2 text-center text-xs text-slate-500">built by akshay</p>
     </main>
   );
 }
