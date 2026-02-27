@@ -3,6 +3,8 @@ import { ensureAppUser, SYSTEM_USER_ID } from '@/lib/appUser';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/currency';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   await ensureAppUser();
 

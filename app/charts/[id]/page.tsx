@@ -4,6 +4,8 @@ import { ensureAppUser, SYSTEM_USER_ID } from '@/lib/appUser';
 import { prisma } from '@/lib/prisma';
 import { ChartRow } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 type Props = {
   params: { id: string };
 };
