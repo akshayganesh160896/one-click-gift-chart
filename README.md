@@ -1,49 +1,103 @@
-# Strategic Planning App
+# One Click Gift Chart
 
-A clean, single-page strategic planning app to map organizational pillars, objectives, and projects, then visualize priorities on a live urgency vs complexity matrix. The dashboard updates instantly as you add or edit data.
+Production-ready Next.js web app for creating, editing, saving, and exporting capital campaign gift charts from a single campaign goal input.
 
-## What It Does
-- Build a strategic framework of **Pillars → Objectives → Projects**
-- Score each project by **budget**, **urgency**, **complexity**, and **hours**
-- Compute a **strategic score** as a weighted average of urgency, complexity, and hours
-- Visualize projects in a **bubble matrix** (Urgency vs Complexity)
-- Filter and rank projects live based on selection criteria
+## Stack
+
+- Next.js 14 (App Router) + TypeScript + TailwindCSS
+- PostgreSQL + Prisma ORM
+- ExcelJS export
+- react-hook-form + zod validation
 
 ## Features
-- Inline creation of pillars, objectives, and projects
-- Editable framework table with quick edit actions
-- Dynamic filters embedded in the visualization
-- Bubble size reflects budget; hover shows project details
-- Ranked list of projects by strategic score
-- Responsive layout for desktop and mobile
 
-## How Scoring Works
-Strategic score is a normalized weighted average:
+- Dashboard with chart history and timestamps
+- Gift chart editor with:
+  - 3-tier (default) or 4-tier configuration
+  - Editable gift counts
+  - Lead gift adjustment panel
+  - Deterministic rebalance algorithm
+  - Guaranteed exact total equal to campaign goal
+- Save + revision history
+- Save and download formatted `.xlsx` workbook
 
-`score = urgency * wU + complexity * wC + hours * wH`
+## Local setup
 
-Weights are editable in the dashboard. They are automatically normalized to sum to 1.
+1. Install dependencies:
 
-## How To Run Locally
-Open `index.html` in any modern browser.
+```bash
+npm install
+```
 
-## Publish With GitHub Pages
-1. Push this repo to GitHub.
-2. Go to **Settings → Pages**.
-3. Set **Source** to `Deploy from a branch`.
-4. Choose `main` and `/ (root)`.
-5. Save. Your site will be live at:
-   `https://<your-username>.github.io/<repo-name>/`
+2. Create environment file:
 
-## File Structure
-- `index.html` — App UI, styling, and logic
-- `README.md` — Project overview
+```bash
+cp .env.example .env
+```
 
-## Customize
-- Update theme colors in the `:root` section of `index.html`
-- Add persistence via LocalStorage or a backend
-- Extend filters, scoring logic, or chart interactions
+3. Set environment variables in `.env`:
 
----
+- `DATABASE_URL`
 
-If you want additional features like CSV import/export, authentication, or analytics, just ask.
+4. Apply Prisma migration:
+
+```bash
+npx prisma migrate dev
+npx prisma generate
+```
+
+5. Run app:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Database model
+
+Prisma models include:
+
+- `User`, `Account`, `Session`, `VerificationToken` (NextAuth)
+- `GiftChart` (main persisted chart)
+- `GiftChartRevision` (audit trail snapshots)
+
+Schema: `prisma/schema.prisma`
+Migration SQL: `prisma/migrations/20260227000000_init/migration.sql`
+
+## Excel export
+
+Export endpoint:
+
+- `GET /api/charts/:id/export`
+
+Workbook formatting includes:
+
+- Title row with project name + goal
+- Dark table headers (white bold text)
+- Tier column merged for each tier’s 3 levels
+- Subtotal row per tier: “gifts yielding a total of”
+- Final `TOTAL GIFTS` row
+- Borders, currency formats, and print-friendly widths
+
+Filename format:
+
+- `OneClickGiftChart_<ProjectName>_<Goal>.xlsx`
+
+## Tests
+
+Logic tests for deterministic rebalancing:
+
+```bash
+npm run test
+```
+
+Test file: `tests/rebalance.test.ts`
+
+## API routes
+
+- `POST /api/charts` create
+- `GET /api/charts` list charts
+- `GET /api/charts/:id` fetch single chart
+- `PUT /api/charts/:id` update chart
+- `GET /api/charts/:id/export` download Excel
