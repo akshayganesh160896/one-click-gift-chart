@@ -31,7 +31,9 @@ export async function GET(_: Request, { params }: Context) {
   const safeProject = chart.projectName.replace(/[^a-z0-9-_]/gi, '_');
   const filename = `OneClickGiftChart_${safeProject}_${chart.goalAmount}.xlsx`;
 
-  return new NextResponse(buffer, {
+  const bytes = new Uint8Array(buffer);
+
+  return new NextResponse(bytes, {
     status: 200,
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
