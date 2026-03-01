@@ -69,4 +69,22 @@ describe('gift chart rebalancing', () => {
     expect(tier2).toBeLessThanOrEqual(0.4);
     expect(tier3).toBeLessThanOrEqual(0.15);
   });
+
+  it('prefers even gift counts and 1,2,4 pattern in major campaigns', () => {
+    const rows = generateGiftChart(20000000, 3);
+    const counts = rows.map((row) => row.giftCount);
+
+    expect(counts[0]).toBe(1);
+    expect(counts[1]).toBe(2);
+    expect([3, 4]).toContain(counts[2]);
+
+    const evenCountRatio =
+      counts.slice(1).filter((count) => count % 2 === 0).length / counts.slice(1).length;
+    expect(evenCountRatio).toBeGreaterThanOrEqual(0.75);
+
+    for (let i = 1; i < counts.length; i += 1) {
+      expect(counts[i]).toBeGreaterThanOrEqual(counts[i - 1]);
+      expect(counts[i]).toBeLessThanOrEqual(counts[i - 1] * 2);
+    }
+  });
 });

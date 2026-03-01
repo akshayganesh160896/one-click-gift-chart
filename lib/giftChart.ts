@@ -78,22 +78,55 @@ const buildMajorCampaignBounds = (lead: number, levelCount: number): number[] =>
   return bounds.slice(0, levelCount);
 };
 
+const countEvennessPenalty = (counts: number[]) =>
+  counts.reduce((penalty, count, index) => {
+    // Tier I level 1 can remain odd (typically 1); prefer even elsewhere.
+    if (index === 0) return penalty;
+    return penalty + (count % 2 === 0 ? 0 : 1);
+  }, 0);
+
+const smoothGrowthPenalty = (counts: number[]) => {
+  let penalty = 0;
+  for (let i = 1; i < counts.length; i += 1) {
+    const ratio = counts[i] / counts[i - 1];
+    // Encourage smooth increases closer to ~1.3-1.5 instead of jumps.
+    penalty += Math.abs(ratio - 1.4);
+  }
+  return penalty;
+};
+
+const tierOnePatternPenalty = (n1: number, n2: number, n3: number) => {
+  // Strong preference for 1,2,4; allow 1,2,3 as fallback.
+  const primary = Math.abs(n1 - 1) * 8 + Math.abs(n2 - 2) * 6 + Math.abs(n3 - 4) * 5;
+  const secondary = Math.abs(n1 - 1) * 8 + Math.abs(n2 - 2) * 6 + Math.abs(n3 - 3) * 6;
+  return Math.min(primary, secondary);
+};
+
 const solveTier3Exact = (
   remaining: number,
   bounds: [number, number, number],
   minFirstCount: number
 ): [number, number, number] | null => {
+  let best: [number, number, number] | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
   for (let n1 = minFirstCount; n1 <= minFirstCount * 2; n1 += 1) {
     for (let n2 = n1; n2 <= n1 * 2; n2 += 1) {
       const rem = remaining - n1 * bounds[0] - n2 * bounds[1];
       if (rem < 0 || rem % bounds[2] !== 0) continue;
       const n3 = rem / bounds[2];
       if (n3 >= n2 && n3 <= n2 * 2) {
-        return [n1, n2, n3];
+        const evenPenalty = (n1 % 2 === 0 ? 0 : 1) + (n2 % 2 === 0 ? 0 : 1) + (n3 % 2 === 0 ? 0 : 1);
+        const smoothPenalty = Math.abs(n2 / n1 - 1.4) + Math.abs(n3 / n2 - 1.4);
+        const score = evenPenalty * 2 + smoothPenalty;
+        if (score < bestScore) {
+          bestScore = score;
+          best = [n1, n2, n3];
+        }
       }
     }
   }
-  return null;
+  return best;
 };
 
 const solveMajorCampaignCounts = (rows: ChartRow[], goalAmount: number): number[] | null => {
@@ -118,12 +151,19 @@ const solveMajorCampaignCounts = (rows: ChartRow[], goalAmount: number): number[
               const tier3 = solveTier3Exact(remaining, [bounds[6], bounds[7], bounds[8]], n6);
               if (!tier3) continue;
 
+              const allCounts = [n1, n2, n3, n4, n5, n6, tier3[0], tier3[1], tier3[2]];
               const tier3Share = remaining / goalAmount;
               const score =
-                Math.abs(tier1Share - 0.45) + Math.abs(tier2Share - 0.35) + Math.abs(tier3Share - 0.1);
+                Math.abs(tier1Share - 0.45) * 2 +
+                Math.abs(tier2Share - 0.35) * 2 +
+                Math.abs(tier3Share - 0.1) * 2 +
+                tierOnePatternPenalty(n1, n2, n3) * 1.5 +
+                countEvennessPenalty(allCounts) * 2 +
+                smoothGrowthPenalty(allCounts) +
+                allCounts.reduce((sum, count) => sum + count, 0) * 0.01;
               if (score < bestScore) {
                 bestScore = score;
-                best = [n1, n2, n3, n4, n5, n6, tier3[0], tier3[1], tier3[2]];
+                best = allCounts;
               }
             }
           }
