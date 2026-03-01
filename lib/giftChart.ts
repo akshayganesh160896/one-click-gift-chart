@@ -4,6 +4,7 @@ const TIER_LABELS: TierLabel[] = ['I', 'II', 'III', 'IV'];
 const DEFAULT_COUNTS_3 = [1, 2, 4, 6, 8, 10, 12, 14, 16];
 const DEFAULT_COUNTS_4 = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 22, 26];
 const MAJOR_CAMPAIGN_MIN_GOAL = 20000000;
+const LARGE_CAMPAIGN_MIN_GOAL = 30000000;
 const MAJOR_FIXED_BOUNDS = [1000000, 500000, 250000, 100000];
 
 export const rowsTotal = (rows: ChartRow[]) =>
@@ -73,6 +74,39 @@ const buildMajorCampaignBounds = (lead: number, levelCount: number): number[] =>
     } else {
       bounds.push(Math.max(1000, Math.round(previous / 2 / 1000) * 1000));
     }
+  }
+
+  return bounds.slice(0, levelCount);
+};
+
+const lowerTierFloorForGoal = (goalAmount: number) => {
+  // Keep lower tiers intentionally higher on very large campaigns to reduce gift count volume.
+  if (goalAmount >= 100000000) return 100000;
+  if (goalAmount >= 60000000) return 50000;
+  return 25000;
+};
+
+const buildLargeCampaignBounds = (lead: number, levelCount: number, goalAmount: number): number[] => {
+  const bounds: number[] = [];
+  const t1l1 = roundToNearest(lead, 500000);
+  const t1l2 = roundToNearest(t1l1 / 2, 250000);
+  const t1l3 = roundToNearest(t1l2 / 2, 250000);
+
+  const t2l1 = roundToNearest(t1l3 / 2, 250000);
+  const t2l2 = roundToNearest(t2l1 / 2, 100000);
+  const t2l3 = roundToNearest(t2l2 / 2, 50000);
+
+  const floor = lowerTierFloorForGoal(goalAmount);
+  const t3l3 = floor;
+  const t3l2 = floor * 2;
+  const t3l1 = floor * 4;
+
+  bounds.push(t1l1, t1l2, t1l3, t2l1, t2l2, t2l3, t3l1, t3l2, t3l3);
+
+  while (bounds.length < levelCount) {
+    const previous = bounds[bounds.length - 1];
+    const next = Math.max(floor, Math.round(previous / 2 / 5000) * 5000);
+    bounds.push(next);
   }
 
   return bounds.slice(0, levelCount);
@@ -176,6 +210,10 @@ const solveMajorCampaignCounts = (rows: ChartRow[], goalAmount: number): number[
 };
 
 const buildLowerBounds = (lead: number, levelCount: number, goalAmount: number): number[] => {
+  if (goalAmount > LARGE_CAMPAIGN_MIN_GOAL && levelCount >= 9) {
+    return buildLargeCampaignBounds(lead, levelCount, goalAmount);
+  }
+
   if (goalAmount >= MAJOR_CAMPAIGN_MIN_GOAL && levelCount >= 6) {
     return buildMajorCampaignBounds(lead, levelCount);
   }

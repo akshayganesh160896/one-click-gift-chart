@@ -87,4 +87,17 @@ describe('gift chart rebalancing', () => {
       expect(counts[i]).toBeLessThanOrEqual(counts[i - 1] * 2);
     }
   });
+
+  it('uses elevated tier ranges for campaigns above 30m', () => {
+    const rows = generateGiftChart(40000000, 3);
+    const bounds = rows.map((row) => row.lowerBound);
+    expect(bounds.slice(0, 9)).toEqual([8000000, 4000000, 2000000, 1000000, 500000, 250000, 100000, 50000, 25000]);
+  });
+
+  it('raises the lowest tier floor for very large campaigns', () => {
+    const rows = generateGiftChart(100000000, 3);
+    const bounds = rows.map((row) => row.lowerBound);
+    expect(bounds[8]).toBeGreaterThanOrEqual(100000);
+    expect(bounds[7]).toBeGreaterThanOrEqual(200000);
+  });
 });
