@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ChartRow } from '@/lib/types';
 import {
+  applyHighRangeOverride,
   buildRangeText,
   formatUsd,
   generateGiftChart,
@@ -37,6 +38,16 @@ type Props = {
 };
 
 const defaultLeadGift = (goalAmount: number) => Math.max(1, Math.round(goalAmount * 0.2));
+const ONE_MILLION = 1000000;
+const highRangeOptions = (current: number) => {
+  const options = new Set<number>();
+  options.add(current);
+  options.add(Math.max(ONE_MILLION, current - ONE_MILLION));
+  options.add(current + ONE_MILLION);
+  options.add(Math.max(ONE_MILLION, Math.round((current * 2) / 3 / ONE_MILLION) * ONE_MILLION));
+  options.add(Math.max(ONE_MILLION, Math.round((current * 3) / 4 / ONE_MILLION) * ONE_MILLION));
+  return Array.from(options).sort((a, b) => b - a);
+};
 
 export default function GiftChartEditor({ initial }: Props) {
   const initialGoalAmount = initial?.goalAmount ?? 1000000;
@@ -69,6 +80,12 @@ export default function GiftChartEditor({ initial }: Props) {
 
   const total = useMemo(() => rowsTotal(rows), [rows]);
   const totalGiftCount = useMemo(() => rows.reduce((sum, row) => sum + row.giftCount, 0), [rows]);
+  const editableHighRangeRows = useMemo(
+    () => rows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row, index }) => row.lowerBound >= ONE_MILLION && index !== 0),
+    [rows]
+  );
   const delta = safeGoalAmount - total;
 
   const regenerate = () => {
@@ -97,6 +114,12 @@ export default function GiftChartEditor({ initial }: Props) {
 
   const applyLeadGift = () => {
     const result = updateLeadGiftAndRebalance(rows, safeLeadGiftAmount, safeGoalAmount);
+    setRows(result.rows);
+    setNotice(result.warning ?? null);
+  };
+
+  const handleHighRangeEdit = (rowIndex: number, value: number) => {
+    const result = applyHighRangeOverride(rows, rowIndex, value, safeGoalAmount);
     setRows(result.rows);
     setNotice(result.warning ?? null);
   };
@@ -332,6 +355,27 @@ export default function GiftChartEditor({ initial }: Props) {
           <button className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white" onClick={rebalance}>
             Rebalance
           </button>
+          {editableHighRangeRows.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-slate-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Above 1M Ranges</p>
+              {editableHighRangeRows.map(({ row, index }) => (
+                <label key={row.id} className="block text-xs font-medium text-slate-700">
+                  Tier {row.tierLabel} Level {row.level} lower bound
+                  <select
+                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    value={row.lowerBound}
+                    onChange={(event) => handleHighRangeEdit(index, Number(event.target.value))}
+                  >
+                    {highRangeOptions(row.lowerBound).map((option) => (
+                      <option key={option} value={option}>
+                        {formatUsd(option)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          ) : null}
           <p className={`text-sm ${delta === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
             {delta === 0 ? 'Balanced exactly.' : `Out of balance by ${formatUsd(Math.abs(delta))}`}
           </p>

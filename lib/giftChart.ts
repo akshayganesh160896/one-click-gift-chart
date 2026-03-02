@@ -6,6 +6,8 @@ const DEFAULT_COUNTS_4 = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 22, 26];
 const MAJOR_CAMPAIGN_MIN_GOAL = 20000000;
 const LARGE_CAMPAIGN_MIN_GOAL = 30000000;
 const MAJOR_FIXED_BOUNDS = [1000000, 500000, 250000, 100000];
+const ONE_MILLION = 1000000;
+const FIXED_BELOW_ONE_MILLION = [500000, 250000, 100000, 50000, 25000, 10000];
 
 export const rowsTotal = (rows: ChartRow[]) =>
   rows.reduce((sum, row) => sum + row.giftCount * row.lowerBound, 0);
@@ -88,28 +90,100 @@ const lowerTierFloorForGoal = (goalAmount: number) => {
 
 const buildLargeCampaignBounds = (lead: number, levelCount: number, goalAmount: number): number[] => {
   const bounds: number[] = [];
-  const t1l1 = roundToNearest(lead, 500000);
-  const t1l2 = roundToNearest(t1l1 / 2, 250000);
-  const t1l3 = roundToNearest(t1l2 / 2, 250000);
-
-  const t2l1 = roundToNearest(t1l3 / 2, 250000);
-  const t2l2 = roundToNearest(t2l1 / 2, 100000);
-  const t2l3 = roundToNearest(t2l2 / 2, 50000);
-
   const floor = lowerTierFloorForGoal(goalAmount);
-  const t3l3 = floor;
-  const t3l2 = floor * 2;
-  const t3l1 = floor * 4;
+  const fixedTail = FIXED_BELOW_ONE_MILLION.filter((value) => value >= floor);
 
-  bounds.push(t1l1, t1l2, t1l3, t2l1, t2l2, t2l3, t3l1, t3l2, t3l3);
+  const top = Math.max(ONE_MILLION, roundToNearest(lead, ONE_MILLION));
+  const preferredHighSlots = top >= 20000000 ? 6 : top >= 12000000 ? 5 : 4;
+  const highSlots = Math.max(3, Math.min(preferredHighSlots, levelCount - 3));
+
+  const high: number[] = [top];
+  if (highSlots >= 2) {
+    const secondDefault =
+      top >= 12000000
+        ? Math.floor(((top * 2) / 3) / 2000000) * 2000000
+        : roundToNearest(top / 2, ONE_MILLION);
+    const second = Math.max(2 * ONE_MILLION, Math.min(top - ONE_MILLION, secondDefault));
+    high.push(second);
+  }
+  while (high.length < highSlots) {
+    const previous = high[high.length - 1];
+    let next = Math.max(ONE_MILLION, roundToNearest(previous / 2, ONE_MILLION));
+    if (next >= previous) {
+      next = previous - ONE_MILLION;
+    }
+    if (next < ONE_MILLION) {
+      next = ONE_MILLION;
+    }
+    high.push(next);
+  }
+  high[high.length - 1] = ONE_MILLION;
+
+  bounds.push(...high);
+  for (const value of fixedTail) {
+    if (bounds.length >= levelCount) break;
+    bounds.push(value);
+  }
 
   while (bounds.length < levelCount) {
-    const previous = bounds[bounds.length - 1];
-    const next = Math.max(floor, Math.round(previous / 2 / 5000) * 5000);
-    bounds.push(next);
+    bounds.push(floor);
   }
 
   return bounds.slice(0, levelCount);
+};
+
+const applyFixedTailBelowOneMillion = (rows: ChartRow[], startIndex: number, goalAmount: number) => {
+  const floor = lowerTierFloorForGoal(goalAmount);
+  const fixedTail = FIXED_BELOW_ONE_MILLION.filter((value) => value >= floor);
+  let tailCursor = 0;
+
+  for (let i = startIndex; i < rows.length; i += 1) {
+    const value = fixedTail[Math.min(tailCursor, fixedTail.length - 1)];
+    rows[i].lowerBound = Math.max(floor, value);
+    if (tailCursor < fixedTail.length - 1) tailCursor += 1;
+  }
+};
+
+export const applyHighRangeOverride = (
+  inputRows: ChartRow[],
+  rowIndex: number,
+  nextLowerBound: number,
+  goalAmount: number
+): RebalanceResult => {
+  const rows = cloneRows(inputRows);
+  const normalized = Math.max(ONE_MILLION, roundToNearest(nextLowerBound, ONE_MILLION));
+  rows[rowIndex].lowerBound = normalized;
+
+  for (let i = rowIndex; i >= 1; i -= 1) {
+    rows[i - 1].lowerBound = Math.max(rows[i].lowerBound + ONE_MILLION, rows[i - 1].lowerBound);
+  }
+
+  let tailStart = rows.length;
+  for (let i = rowIndex + 1; i < rows.length; i += 1) {
+    const previous = rows[i - 1].lowerBound;
+    if (previous <= ONE_MILLION) {
+      tailStart = i;
+      break;
+    }
+    const next = Math.max(ONE_MILLION, roundToNearest(previous / 2, ONE_MILLION));
+    rows[i].lowerBound = Math.min(previous - ONE_MILLION, next);
+    if (rows[i].lowerBound <= ONE_MILLION) {
+      rows[i].lowerBound = ONE_MILLION;
+      tailStart = i + 1;
+      break;
+    }
+  }
+
+  if (tailStart < rows.length) {
+    applyFixedTailBelowOneMillion(rows, tailStart, goalAmount);
+  }
+
+  for (let i = 1; i < rows.length; i += 1) {
+    rows[i].upperBound = rows[i - 1].lowerBound - 1;
+  }
+  rows[0].upperBound = null;
+
+  return rebalanceGiftChart(rows, goalAmount);
 };
 
 const countEvennessPenalty = (counts: number[]) =>
