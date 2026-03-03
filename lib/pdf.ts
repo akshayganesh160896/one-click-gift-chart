@@ -182,28 +182,18 @@ export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promis
   drawSimplifiedTable(page, groups, 'Campaign Gift Ranges', rangeText, 40, topY, tableWidth, regular, bold);
   drawSimplifiedTable(page, groups, 'Sample Annual Payments (over 5 years)', annualRangeText, 422, topY, tableWidth, regular, bold);
 
-  // Metallic rendered arrow between tables (teal-tinted to match #40c1ac theme).
-  const arrowOuter =
-    'M 354 342 L 404 342 L 404 362 L 444 334 L 404 306 L 404 326 L 354 326 Z';
-  const arrowInner =
-    'M 357 339 L 402 339 L 402 357 L 438 334 L 402 311 L 402 329 L 357 329 Z';
-  const arrowGloss =
-    'M 360 336 L 399 336 L 399 347 L 424 334 L 399 321 L 399 332 L 360 332 Z';
-
-  page.drawSvgPath(arrowOuter, { color: rgb(0.08, 0.20, 0.18), opacity: 0.24 });
-  page.drawSvgPath(arrowOuter, {
-    color: rgb(0.16, 0.46, 0.41),
-    borderColor: rgb(0.08, 0.24, 0.21),
-    borderWidth: 1.4
+  // Simple clear arrow between tables.
+  const arrowY = 318;
+  page.drawLine({
+    start: { x: 372, y: arrowY },
+    end: { x: 410, y: arrowY },
+    thickness: 7,
+    color: BRAND_DARK
   });
-  page.drawSvgPath(arrowInner, {
-    color: rgb(0.40, 0.82, 0.74),
-    borderColor: rgb(0.82, 0.97, 0.93),
-    borderWidth: 0.8
-  });
-  page.drawSvgPath(arrowGloss, {
-    color: rgb(1, 1, 1),
-    opacity: 0.24
+  page.drawSvgPath('M 410 332 L 434 318 L 410 304 Z', {
+    color: BRAND_DARK,
+    borderColor: BRAND_DARK,
+    borderWidth: 1
   });
 
   const bytes = await pdf.save();
