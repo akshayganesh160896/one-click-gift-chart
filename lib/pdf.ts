@@ -183,11 +183,22 @@ export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promis
   drawSimplifiedTable(page, groups, 'Sample Annual Payments (over 5 years)', annualRangeText, 422, topY, tableWidth, regular, bold);
 
   // Simple clear arrow between tables.
-  page.drawSvgPath('M 382 362 L 454 318 L 382 274 Z', {
-    color: BRAND_DARK,
-    borderColor: BRAND_DARK,
-    borderWidth: 1.2
-  });
+  // Guaranteed visible triangle marker between the tables.
+  const leftX = 386;
+  const centerX = 450;
+  const centerY = 318;
+  const halfHeight = 40;
+  for (let dy = -halfHeight; dy <= halfHeight; dy += 2) {
+    const t = 1 - Math.abs(dy) / halfHeight;
+    const startX = leftX;
+    const endX = leftX + t * (centerX - leftX);
+    page.drawLine({
+      start: { x: startX, y: centerY + dy },
+      end: { x: endX, y: centerY + dy },
+      thickness: 2,
+      color: BRAND_DARK
+    });
+  }
 
   const bytes = await pdf.save();
   return Buffer.from(bytes);

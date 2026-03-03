@@ -329,7 +329,7 @@ export default function GiftChartEditor({ initial }: Props) {
     try {
       const id = await saveChart();
       if (!id) return;
-      window.location.assign(`/api/charts/${id}/pdf`);
+      window.location.assign(`/api/charts/${id}/pdf?ts=${Date.now()}`);
       setNotice('Saved and downloaded simplified PDF.');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Failed to save and export PDF.');
