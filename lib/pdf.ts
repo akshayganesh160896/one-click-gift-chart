@@ -141,7 +141,7 @@ const drawSimplifiedTable = (
         borderColor: BORDER,
         borderWidth: 1
       });
-      drawCenteredText(page, getRange(group.rows[i]), bold, 10.5, x + tierWidth, rowY + 8, rangeWidth, TEXT);
+      drawCenteredText(page, getRange(group.rows[i]), regular, 10.5, x + tierWidth, rowY + 8, rangeWidth, TEXT);
       stripe += 1;
     }
 
@@ -182,17 +182,23 @@ export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promis
   drawSimplifiedTable(page, groups, 'Campaign Gift Ranges', rangeText, 40, topY, tableWidth, regular, bold);
   drawSimplifiedTable(page, groups, 'Sample Annual Payments (over 5 years)', annualRangeText, 422, topY, tableWidth, regular, bold);
 
-  // Proper stylized arrow between tables.
-  page.drawSvgPath('M 360 320 L 404 320 L 404 332 L 432 312 L 404 292 L 404 304 L 360 304 Z', {
-    color: SHADOW,
-    opacity: 0.22
+  // Clear arrow between tables.
+  const arrowY = 318;
+  page.drawLine({
+    start: { x: 366, y: arrowY },
+    end: { x: 420, y: arrowY },
+    thickness: 10,
+    color: BRAND_MID
   });
-  page.drawSvgPath('M 356 324 L 400 324 L 400 336 L 428 316 L 400 296 L 400 308 L 356 308 Z', {
+  page.drawSvgPath('M 420 336 L 446 318 L 420 300 Z', {
     color: BRAND_MID,
     borderColor: BORDER,
-    borderWidth: 1.2
+    borderWidth: 1
   });
-  page.drawSvgPath('M 362 323 L 398 323 L 398 333 L 420 316 L 398 299 L 398 309 L 362 309 Z', {
+  page.drawLine({
+    start: { x: 366, y: arrowY + 3 },
+    end: { x: 420, y: arrowY + 3 },
+    thickness: 2,
     color: rgb(1, 1, 1),
     opacity: 0.18
   });
