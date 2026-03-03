@@ -50,22 +50,26 @@ const highRangeOptions = (current: number) => {
 };
 
 export default function GiftChartEditor({ initial }: Props) {
-  const initialGoalAmount = initial?.goalAmount ?? 1000000;
-  const initialLeadGiftAmount = initial?.leadGiftAmount ?? defaultLeadGift(initialGoalAmount);
+  const hasInitial = Boolean(initial);
+  const initialGoalAmount = initial?.goalAmount;
+  const initialLeadGiftAmount =
+    initial && typeof initial.goalAmount === 'number'
+      ? initial.leadGiftAmount ?? defaultLeadGift(initial.goalAmount)
+      : undefined;
 
   const router = useRouter();
   const [chartId, setChartId] = useState(initial?.id ?? null);
   const [rows, setRows] = useState<ChartRow[]>(
-    initial?.rows ?? generateGiftChart(initialGoalAmount, 3, initialLeadGiftAmount)
+    initial?.rows ?? []
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLeadAuto, setIsLeadAuto] = useState(!initial);
+  const [isLeadAuto, setIsLeadAuto] = useState(true);
 
   const form = useForm<EditorForm>({
     resolver: zodResolver(editorSchema),
     defaultValues: {
-      projectName: initial?.projectName ?? 'New Campaign',
+      projectName: initial?.projectName ?? '',
       goalAmount: initialGoalAmount,
       tiersCount: initial?.tiersCount ?? 3,
       leadGiftAmount: initialLeadGiftAmount
@@ -89,6 +93,11 @@ export default function GiftChartEditor({ initial }: Props) {
   const delta = safeGoalAmount - total;
 
   const regenerate = () => {
+    if (safeGoalAmount <= 0) {
+      setRows([]);
+      setNotice('Enter a campaign goal to generate the chart.');
+      return;
+    }
     const leadToUse = isLeadAuto ? defaultLeadGift(safeGoalAmount) : safeLeadGiftAmount;
     if (isLeadAuto) {
       form.setValue('leadGiftAmount', leadToUse, { shouldValidate: true });
@@ -113,9 +122,33 @@ export default function GiftChartEditor({ initial }: Props) {
   };
 
   const applyLeadGift = () => {
+    if (safeGoalAmount <= 0) {
+      setNotice('Enter a campaign goal to apply lead gift.');
+      return;
+    }
+    if (rows.length === 0) {
+      const generated = generateGiftChart(safeGoalAmount, tiersCount, safeLeadGiftAmount);
+      setRows(generated);
+      setNotice('Applied lead gift to a newly generated chart.');
+      return;
+    }
     const result = updateLeadGiftAndRebalance(rows, safeLeadGiftAmount, safeGoalAmount);
     setRows(result.rows);
     setNotice(result.warning ?? null);
+  };
+
+  const resetChart = () => {
+    setIsLeadAuto(true);
+    if (safeGoalAmount <= 0) {
+      form.setValue('leadGiftAmount', undefined as unknown as number);
+      setRows([]);
+      setNotice('Reset complete. Enter campaign goal to generate defaults.');
+      return;
+    }
+    const resetLead = defaultLeadGift(safeGoalAmount);
+    form.setValue('leadGiftAmount', resetLead, { shouldValidate: true });
+    setRows(generateGiftChart(safeGoalAmount, tiersCount, resetLead));
+    setNotice('Chart reset to default ranges and counts.');
   };
 
   const handleHighRangeEdit = (rowIndex: number, value: number) => {
@@ -128,6 +161,10 @@ export default function GiftChartEditor({ initial }: Props) {
     const parsed = editorSchema.safeParse(form.getValues());
     if (!parsed.success) {
       form.trigger();
+      return null;
+    }
+    if (rows.length === 0) {
+      setNotice('Generate a chart before saving.');
       return null;
     }
 
@@ -241,7 +278,14 @@ export default function GiftChartEditor({ initial }: Props) {
                 {...form.register('goalAmount', {
                   valueAsNumber: true,
                   onChange: (event) => {
-                    const nextGoal = Math.max(1, Number(event.target.value) || 0);
+                    const rawValue = String(event.target.value ?? '').trim();
+                    if (!rawValue) {
+                      form.setValue('leadGiftAmount', undefined as unknown as number);
+                      setRows([]);
+                      setNotice(null);
+                      return;
+                    }
+                    const nextGoal = Math.max(1, Number(rawValue) || 0);
                     if (!isLeadAuto) {
                       return;
                     }
@@ -318,12 +362,20 @@ export default function GiftChartEditor({ initial }: Props) {
                     </Fragment>
                   );
                 })}
-                <tr className="bg-slate-900 text-white">
-                  <td className="px-3 py-2 font-semibold" colSpan={4}>
-                    TOTAL GIFTS
-                  </td>
-                  <td className="px-3 py-2 font-semibold">{formatUsd(total)}</td>
-                </tr>
+                {rows.length > 0 ? (
+                  <tr className="bg-slate-900 text-white">
+                    <td className="px-3 py-2 font-semibold" colSpan={4}>
+                      TOTAL GIFTS
+                    </td>
+                    <td className="px-3 py-2 font-semibold">{formatUsd(total)}</td>
+                  </tr>
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-slate-500">
+                      Enter project name and campaign goal, then click Regenerate to create the chart.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -351,6 +403,9 @@ export default function GiftChartEditor({ initial }: Props) {
           </label>
           <button className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold" onClick={applyLeadGift}>
             Apply Lead Gift
+          </button>
+          <button className="w-full rounded-lg border border-brand px-3 py-2 text-sm font-semibold text-brand" onClick={resetChart}>
+            Reset Chart
           </button>
           <button className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white" onClick={rebalance}>
             Rebalance
