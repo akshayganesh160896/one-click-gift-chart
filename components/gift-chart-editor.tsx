@@ -309,6 +309,29 @@ export default function GiftChartEditor({ initial }: Props) {
     }
   };
 
+  const onSaveAndPdf = async () => {
+    setIsSaving(true);
+    try {
+      const id = await saveChart();
+      if (!id) return;
+      const response = await fetch(`/api/charts/${id}/pdf`);
+      if (!response.ok) throw new Error('Failed to export PDF');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      const safeProject = form.getValues('projectName').replace(/[^a-z0-9-_]/gi, '_');
+      anchor.download = `OneClickGiftChart_${safeProject}_${form.getValues('goalAmount')}_Simplified.pdf`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice('Saved and downloaded simplified PDF.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Failed to save and export PDF.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -330,6 +353,13 @@ export default function GiftChartEditor({ initial }: Props) {
             disabled={isSaving}
           >
             Save & Download Excel
+          </button>
+          <button
+            className="rounded-lg border border-brand bg-white px-4 py-2 text-sm font-semibold text-brand"
+            onClick={onSaveAndPdf}
+            disabled={isSaving}
+          >
+            Save & Download PDF
           </button>
         </div>
       </div>
