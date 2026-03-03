@@ -128,7 +128,7 @@ export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promis
   drawSimplifiedTable(page, groups, 'Campaign Gift Ranges', rangeText, 40, topY, tableWidth, regular, bold);
   drawSimplifiedTable(page, groups, 'Sample Annual Payments (over 5 years)', annualRangeText, 422, topY, tableWidth, regular, bold);
 
-  page.drawText('→', { x: 385, y: 330, size: 36, font: bold, color: BRAND_DARK });
+  page.drawText('->', { x: 390, y: 338, size: 24, font: bold, color: BRAND_DARK });
 
   const bytes = await pdf.save();
   return Buffer.from(bytes);
