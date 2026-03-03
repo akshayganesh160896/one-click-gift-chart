@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -328,16 +329,7 @@ export default function GiftChartEditor({ initial }: Props) {
     try {
       const id = await saveChart();
       if (!id) return;
-      const response = await fetch(`/api/charts/${id}/pdf`);
-      if (!response.ok) throw new Error('Failed to export PDF');
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      const safeProject = form.getValues('projectName').replace(/[^a-z0-9-_]/gi, '_');
-      anchor.download = `OneClickGiftChart_${safeProject}_${form.getValues('goalAmount')}_Simplified.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      window.location.assign(`/api/charts/${id}/pdf`);
       setNotice('Saved and downloaded simplified PDF.');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Failed to save and export PDF.');
@@ -350,6 +342,9 @@ export default function GiftChartEditor({ initial }: Props) {
     <main className="mx-auto max-w-7xl px-6 py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
+          <Link href="/dashboard" className="mb-2 inline-block text-sm font-semibold text-brand hover:underline">
+            ← Back to Dashboard
+          </Link>
           <h1 className="text-2xl font-bold">Gift Chart Editor</h1>
           <p className="text-sm text-slate-600">Live edits keep totals aligned with campaign goal.</p>
         </div>
@@ -515,7 +510,7 @@ export default function GiftChartEditor({ initial }: Props) {
                   </tr>
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-slate-500">
+                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-slate-500">
                       Enter project name and campaign goal, then click Regenerate to create the chart.
                     </td>
                   </tr>
