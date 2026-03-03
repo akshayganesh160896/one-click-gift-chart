@@ -184,10 +184,10 @@ export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promis
 
   // Simple clear arrow between tables.
   // Guaranteed visible triangle marker between the tables.
-  const leftX = 386;
-  const centerX = 450;
+  const leftX = 390;
+  const centerX = 430;
   const centerY = 318;
-  const halfHeight = 40;
+  const halfHeight = 24;
   for (let dy = -halfHeight; dy <= halfHeight; dy += 2) {
     const t = 1 - Math.abs(dy) / halfHeight;
     const startX = leftX;
