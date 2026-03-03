@@ -1,4 +1,4 @@
-import PDFDocument from 'pdfkit';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ChartRow } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 
@@ -12,10 +12,11 @@ type TierGroup = {
   rows: ChartRow[];
 };
 
-const BRAND = '#40c1ac';
-const BRAND_DARK = '#2a9d8b';
-const LIGHT_BG = '#e9faf7';
-const BORDER = '#2f6f66';
+const BRAND = rgb(0.25, 0.76, 0.67); // #40c1ac
+const BRAND_DARK = rgb(0.17, 0.62, 0.55);
+const BG_ALT = rgb(0.93, 0.98, 0.97);
+const BORDER = rgb(0.17, 0.44, 0.40);
+const TEXT = rgb(0.06, 0.09, 0.16);
 
 const rangeText = (row: ChartRow): string => {
   if (row.upperBound === null) return `${formatCurrency(row.lowerBound)} or more`;
@@ -30,97 +31,105 @@ const annualRangeText = (row: ChartRow): string => {
 };
 
 const groupByTier = (rows: ChartRow[]): TierGroup[] => {
-  const byTier = new Map<number, TierGroup>();
+  const map = new Map<number, TierGroup>();
   for (const row of rows) {
-    const group = byTier.get(row.tier) ?? { tierLabel: row.tierLabel, rows: [] };
+    const group = map.get(row.tier) ?? { tierLabel: row.tierLabel, rows: [] };
     group.rows.push(row);
-    byTier.set(row.tier, group);
+    map.set(row.tier, group);
   }
-  return Array.from(byTier.entries())
+  return Array.from(map.entries())
     .sort((a, b) => a[0] - b[0])
-    .map((entry) => entry[1]);
+    .map(([, value]) => value);
 };
 
-const drawSimplifiedTable = (
-  doc: PDFKit.PDFDocument,
+const drawCenteredText = (
+  page: import('pdf-lib').PDFPage,
+  text: string,
+  font: import('pdf-lib').PDFFont,
+  size: number,
   x: number,
   y: number,
   width: number,
-  title: string,
-  groups: TierGroup[],
-  getRange: (row: ChartRow) => string
-): number => {
-  const tierWidth = 84;
-  const rangeWidth = width - tierWidth;
-  const headerHeight = 44;
-  const rowHeight = 28;
-
-  doc.save();
-
-  doc.roundedRect(x, y, width, headerHeight, 8).fillAndStroke(BRAND_DARK, BORDER);
-  doc.fillColor('white').font('Helvetica-Bold').fontSize(12).text(title, x, y + 12, {
-    width,
-    align: 'center'
+  color = TEXT
+) => {
+  const textWidth = font.widthOfTextAtSize(text, size);
+  page.drawText(text, {
+    x: x + Math.max(0, (width - textWidth) / 2),
+    y,
+    size,
+    font,
+    color
   });
+};
 
-  let cursorY = y + headerHeight;
-  let rowIndex = 0;
+const drawSimplifiedTable = (
+  page: import('pdf-lib').PDFPage,
+  groups: TierGroup[],
+  title: string,
+  getRange: (row: ChartRow) => string,
+  x: number,
+  topY: number,
+  width: number,
+  regular: import('pdf-lib').PDFFont,
+  bold: import('pdf-lib').PDFFont
+) => {
+  const tierWidth = 72;
+  const rangeWidth = width - tierWidth;
+  const headerHeight = 34;
+  const rowHeight = 24;
+
+  page.drawRectangle({ x, y: topY - headerHeight, width, height: headerHeight, color: BRAND_DARK, borderColor: BORDER, borderWidth: 1.2 });
+  drawCenteredText(page, title, bold, 11, x, topY - 21, width, rgb(1, 1, 1));
+
+  let cursorY = topY - headerHeight;
+  let stripe = 0;
 
   for (const group of groups) {
     const groupHeight = group.rows.length * rowHeight;
 
-    doc.rect(x, cursorY, tierWidth, groupHeight).fillAndStroke(BRAND, BORDER);
-    doc.fillColor('white').font('Helvetica-Bold').fontSize(12).text(`Tier ${group.tierLabel}`, x, cursorY + groupHeight / 2 - 8, {
-      width: tierWidth,
-      align: 'center'
-    });
+    page.drawRectangle({ x, y: cursorY - groupHeight, width: tierWidth, height: groupHeight, color: BRAND, borderColor: BORDER, borderWidth: 1 });
+    drawCenteredText(page, `Tier ${group.tierLabel}`, bold, 11, x, cursorY - groupHeight / 2 - 4, tierWidth, rgb(1, 1, 1));
 
     for (let i = 0; i < group.rows.length; i += 1) {
-      const row = group.rows[i];
-      const rowY = cursorY + i * rowHeight;
-      const fill = rowIndex % 2 === 0 ? '#ffffff' : LIGHT_BG;
-      doc.rect(x + tierWidth, rowY, rangeWidth, rowHeight).fillAndStroke(fill, BORDER);
-      doc.fillColor('#0f172a').font('Helvetica').fontSize(11).text(getRange(row), x + tierWidth + 8, rowY + 8, {
-        width: rangeWidth - 16,
-        align: 'center'
+      const rowY = cursorY - (i + 1) * rowHeight;
+      page.drawRectangle({
+        x: x + tierWidth,
+        y: rowY,
+        width: rangeWidth,
+        height: rowHeight,
+        color: stripe % 2 === 0 ? rgb(1, 1, 1) : BG_ALT,
+        borderColor: BORDER,
+        borderWidth: 1
       });
-      rowIndex += 1;
+      drawCenteredText(page, getRange(group.rows[i]), regular, 10, x + tierWidth, rowY + 8, rangeWidth, TEXT);
+      stripe += 1;
     }
 
-    doc.lineWidth(1.7).moveTo(x, cursorY + groupHeight).lineTo(x + width, cursorY + groupHeight).strokeColor(BORDER).stroke();
-    cursorY += groupHeight;
-    doc.lineWidth(1);
+    page.drawLine({ start: { x, y: cursorY - groupHeight }, end: { x: x + width, y: cursorY - groupHeight }, thickness: 1.8, color: BORDER });
+    cursorY -= groupHeight;
   }
-
-  doc.restore();
-  return cursorY - y;
 };
 
 export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'LETTER', margin: 40 });
-    const chunks: Buffer[] = [];
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([792, 612]);
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
+  page.drawRectangle({ x: 0, y: 0, width: 792, height: 612, color: rgb(0.97, 1, 0.99) });
 
-    doc.rect(0, 0, doc.page.width, doc.page.height).fill('#f8fffd');
-    doc.fillColor(BRAND_DARK).font('Helvetica-Bold').fontSize(24).text(input.projectName, 40, 36);
-    doc.fillColor('#0f172a').font('Helvetica').fontSize(13).text('Simplified Gift Chart', 40, 66);
+  page.drawText(input.projectName, { x: 40, y: 560, size: 22, font: bold, color: BRAND_DARK });
+  page.drawText('Simplified Gift Chart', { x: 40, y: 538, size: 13, font: regular, color: TEXT });
 
-    const groups = groupByTier(input.rows);
-    const topY = 104;
-    const tableWidth = 252;
-    const leftX = 40;
-    const rightX = 320;
+  const groups = groupByTier(input.rows);
+  const topY = 500;
+  const tableWidth = 330;
 
-    drawSimplifiedTable(doc, leftX, topY, tableWidth, 'Campaign Gift Ranges', groups, rangeText);
+  drawSimplifiedTable(page, groups, 'Campaign Gift Ranges', rangeText, 40, topY, tableWidth, regular, bold);
+  drawSimplifiedTable(page, groups, 'Sample Annual Payments (over 5 years)', annualRangeText, 422, topY, tableWidth, regular, bold);
 
-    doc.fillColor(BRAND_DARK).font('Helvetica-Bold').fontSize(28).text('→', 292, 248, { width: 20, align: 'center' });
+  page.drawText('→', { x: 385, y: 330, size: 36, font: bold, color: BRAND_DARK });
 
-    drawSimplifiedTable(doc, rightX, topY, tableWidth, 'Sample Annual Payments (over 5 years)', groups, annualRangeText);
-
-    doc.end();
-  });
+  const bytes = await pdf.save();
+  return Buffer.from(bytes);
 }
