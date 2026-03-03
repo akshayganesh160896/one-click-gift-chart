@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { ChartRow } from '@/lib/types';
 import { generateSimplifiedGiftChartPdf } from '@/lib/pdf';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 type Context = {
   params: { id: string };
 };
