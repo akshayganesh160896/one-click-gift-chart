@@ -141,10 +141,21 @@ const drawSimplifiedTable = (
         borderColor: BORDER,
         borderWidth: 1
       });
-      drawCenteredText(page, getRange(group.rows[i]), regular, 10, x + tierWidth, rowY + 8, rangeWidth, TEXT);
+      drawCenteredText(page, getRange(group.rows[i]), bold, 10.5, x + tierWidth, rowY + 8, rangeWidth, TEXT);
       stripe += 1;
     }
 
+    // Thick outline to separate each tier block.
+    page.drawRectangle({
+      x,
+      y: cursorY - groupHeight,
+      width,
+      height: groupHeight,
+      borderColor: BORDER,
+      borderWidth: 2.2,
+      color: rgb(0, 0, 0),
+      opacity: 0
+    });
     page.drawLine({ start: { x, y: cursorY - groupHeight }, end: { x: x + width, y: cursorY - groupHeight }, thickness: 1.8, color: BORDER });
     cursorY -= groupHeight;
   }
@@ -171,14 +182,19 @@ export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promis
   drawSimplifiedTable(page, groups, 'Campaign Gift Ranges', rangeText, 40, topY, tableWidth, regular, bold);
   drawSimplifiedTable(page, groups, 'Sample Annual Payments (over 5 years)', annualRangeText, 422, topY, tableWidth, regular, bold);
 
-  // Rendered arrow badge between tables.
-  page.drawRectangle({ x: 368, y: 292, width: 56, height: 56, color: SHADOW, opacity: 0.16 });
-  page.drawRectangle({ x: 364, y: 296, width: 56, height: 56, color: BRAND_MID, borderColor: BORDER, borderWidth: 1 });
-  page.drawRectangle({ x: 364, y: 342, width: 56, height: 10, color: rgb(1, 1, 1), opacity: 0.18 });
-  page.drawSvgPath('M 378 323 L 398 323 L 398 334 L 412 320 L 398 306 L 398 317 L 378 317 Z', {
+  // Proper stylized arrow between tables.
+  page.drawSvgPath('M 360 320 L 404 320 L 404 332 L 432 312 L 404 292 L 404 304 L 360 304 Z', {
+    color: SHADOW,
+    opacity: 0.22
+  });
+  page.drawSvgPath('M 356 324 L 400 324 L 400 336 L 428 316 L 400 296 L 400 308 L 356 308 Z', {
+    color: BRAND_MID,
+    borderColor: BORDER,
+    borderWidth: 1.2
+  });
+  page.drawSvgPath('M 362 323 L 398 323 L 398 333 L 420 316 L 398 299 L 398 309 L 362 309 Z', {
     color: rgb(1, 1, 1),
-    borderColor: rgb(1, 1, 1),
-    borderWidth: 0.5
+    opacity: 0.18
   });
 
   const bytes = await pdf.save();
