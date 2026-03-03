@@ -183,14 +183,7 @@ export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promis
   drawSimplifiedTable(page, groups, 'Sample Annual Payments (over 5 years)', annualRangeText, 422, topY, tableWidth, regular, bold);
 
   // Simple clear arrow between tables.
-  const arrowY = 318;
-  page.drawLine({
-    start: { x: 372, y: arrowY },
-    end: { x: 410, y: arrowY },
-    thickness: 7,
-    color: BRAND_DARK
-  });
-  page.drawSvgPath('M 410 332 L 434 318 L 410 304 Z', {
+  page.drawSvgPath('M 396 338 L 438 318 L 396 298 Z', {
     color: BRAND_DARK,
     borderColor: BRAND_DARK,
     borderWidth: 1
