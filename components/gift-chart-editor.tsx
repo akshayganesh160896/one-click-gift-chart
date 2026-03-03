@@ -84,6 +84,7 @@ export default function GiftChartEditor({ initial }: Props) {
 
   const total = useMemo(() => rowsTotal(rows), [rows]);
   const totalGiftCount = useMemo(() => rows.reduce((sum, row) => sum + row.giftCount, 0), [rows]);
+  const tier3Rows = useMemo(() => rows.filter((row) => row.tier === 3), [rows]);
   const editableHighRangeRows = useMemo(
     () => rows
       .map((row, index) => ({ row, index }))
@@ -155,6 +156,76 @@ export default function GiftChartEditor({ initial }: Props) {
     const result = applyHighRangeOverride(rows, rowIndex, value, safeGoalAmount);
     setRows(result.rows);
     setNotice(result.warning ?? null);
+  };
+
+  const normalizeRanges = (input: ChartRow[]) => {
+    const next = input.map((row) => ({ ...row }));
+    for (let i = 1; i < next.length; i += 1) {
+      next[i].upperBound = next[i - 1].lowerBound - 1;
+    }
+    if (next.length > 0) {
+      next[0].upperBound = null;
+    }
+    return next;
+  };
+
+  const renumberTierLevels = (input: ChartRow[], tier: number) => {
+    let level = 1;
+    return input.map((row) => {
+      if (row.tier !== tier) return row;
+      const next = { ...row, level };
+      level += 1;
+      return next;
+    });
+  };
+
+  const removeTier3Level = () => {
+    const current = rows.filter((row) => row.tier === 3);
+    if (current.length <= 1) return;
+    const targetId = current[current.length - 1].id;
+    const next = rows.filter((row) => row.id !== targetId);
+    const normalized = normalizeRanges(renumberTierLevels(next, 3));
+    const result = rebalanceGiftChart(normalized, safeGoalAmount);
+    setRows(result.rows);
+    setNotice('Removed one level from Tier III and rebalanced.');
+  };
+
+  const addTier3Level = () => {
+    const current = rows.filter((row) => row.tier === 3);
+    if (current.length >= 3) return;
+    if (safeGoalAmount <= 0) return;
+
+    const template = generateGiftChart(
+      safeGoalAmount,
+      tiersCount,
+      isLeadAuto ? defaultLeadGift(safeGoalAmount) : safeLeadGiftAmount
+    ).filter((row) => row.tier === 3);
+
+    const templateRow = template[current.length];
+    if (!templateRow) return;
+
+    const insertAt = rows.findIndex((row) => row.tier > 3);
+    const newRow: ChartRow = {
+      ...templateRow,
+      id: `r-3-${Date.now()}-${current.length + 1}`,
+      level: current.length + 1,
+      giftCount: Math.max(
+        current[current.length - 1]?.giftCount ?? 1,
+        templateRow.giftCount
+      )
+    };
+
+    const next = [...rows];
+    if (insertAt === -1) {
+      next.push(newRow);
+    } else {
+      next.splice(insertAt, 0, newRow);
+    }
+
+    const normalized = normalizeRanges(renumberTierLevels(next, 3));
+    const result = rebalanceGiftChart(normalized, safeGoalAmount);
+    setRows(result.rows);
+    setNotice('Added one level to Tier III and rebalanced.');
   };
 
   const saveChart = async () => {
@@ -327,13 +398,16 @@ export default function GiftChartEditor({ initial }: Props) {
                   <th className="px-3 py-2 text-left">Number of Gifts Needed</th>
                   <th className="px-3 py-2 text-left">Gift Range</th>
                   <th className="px-3 py-2 text-left">Gift Total</th>
+                  <th className="px-3 py-2 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, index) => {
                   const showTier = row.level === 1;
-                  const showSubtotal = row.level === 3;
+                  const nextRow = rows[index + 1];
+                  const showSubtotal = !nextRow || nextRow.tier !== row.tier;
                   const subtotal = showSubtotal ? tierSubtotal(rows, row.tier) : null;
+                  const isTier3Last = row.tier === 3 && (!nextRow || nextRow.tier !== 3);
                   return (
                     <Fragment key={row.id}>
                       <tr className="border-b">
@@ -350,10 +424,36 @@ export default function GiftChartEditor({ initial }: Props) {
                         </td>
                         <td className="px-3 py-2">{buildRangeText(row)}</td>
                         <td className="px-3 py-2">{formatUsd(row.giftCount * row.lowerBound)}</td>
+                        <td className="px-3 py-2">
+                          {isTier3Last ? (
+                            <div className="flex items-center gap-2">
+                              {tier3Rows.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={removeTier3Level}
+                                  className="rounded border border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-700"
+                                  title="Remove lowest Tier III level"
+                                >
+                                  x
+                                </button>
+                              ) : null}
+                              {tier3Rows.length < 3 ? (
+                                <button
+                                  type="button"
+                                  onClick={addTier3Level}
+                                  className="rounded border border-brand px-2 py-0.5 text-xs font-semibold text-brand"
+                                  title="Add Tier III level"
+                                >
+                                  +
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </td>
                       </tr>
                       {showSubtotal ? (
                         <tr className="border-b bg-slate-50/70 text-slate-700">
-                          <td className="px-3 py-2 text-xs font-semibold" colSpan={4}>
+                          <td className="px-3 py-2 text-xs font-semibold" colSpan={5}>
                             gifts yielding a total of
                           </td>
                           <td className="px-3 py-2 text-sm font-semibold">{formatUsd(subtotal ?? 0)}</td>
@@ -364,7 +464,7 @@ export default function GiftChartEditor({ initial }: Props) {
                 })}
                 {rows.length > 0 ? (
                   <tr className="bg-slate-900 text-white">
-                    <td className="px-3 py-2 font-semibold" colSpan={4}>
+                    <td className="px-3 py-2 font-semibold" colSpan={5}>
                       TOTAL GIFTS
                     </td>
                     <td className="px-3 py-2 font-semibold">{formatUsd(total)}</td>

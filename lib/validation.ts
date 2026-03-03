@@ -15,12 +15,14 @@ export const chartSchema = z.object({
   goalAmount: z.number().int().min(1),
   tiersCount: z.union([z.literal(3), z.literal(4)]),
   leadGiftAmount: z.number().int().min(1),
-  rows: z.array(chartRowSchema).min(9).max(12)
+  rows: z.array(chartRowSchema).min(7).max(12)
 }).superRefine((data, ctx) => {
-  if (data.rows.length !== data.tiersCount * 3) {
+  const maxRows = data.tiersCount * 3;
+  const minRows = maxRows - 2;
+  if (data.rows.length > maxRows || data.rows.length < minRows) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Row count must match tier count * 3.',
+      message: 'Row count must be within allowed range for selected tiers.',
       path: ['rows']
     });
   }

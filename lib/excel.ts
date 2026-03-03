@@ -63,7 +63,7 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
       currentRow += 1;
     }
 
-    sheet.mergeCells(`A${tierStart}:A${tierStart + 2}`);
+    sheet.mergeCells(`A${tierStart}:A${tierStart + tierRows.length - 1}`);
     const tierCell = sheet.getCell(`A${tierStart}`);
     tierCell.alignment = { horizontal: 'center', vertical: 'middle' };
     tierCell.font = { bold: true, color: { argb: ink } };
