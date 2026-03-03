@@ -65,6 +65,7 @@ export default function GiftChartEditor({ initial }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLeadAuto, setIsLeadAuto] = useState(true);
+  const [removedTier3Rows, setRemovedTier3Rows] = useState<ChartRow[]>([]);
 
   const form = useForm<EditorForm>({
     resolver: zodResolver(editorSchema),
@@ -105,6 +106,7 @@ export default function GiftChartEditor({ initial }: Props) {
     }
     const generated = generateGiftChart(safeGoalAmount, tiersCount, leadToUse);
     setRows(generated);
+    setRemovedTier3Rows([]);
     setNotice(null);
   };
 
@@ -130,11 +132,13 @@ export default function GiftChartEditor({ initial }: Props) {
     if (rows.length === 0) {
       const generated = generateGiftChart(safeGoalAmount, tiersCount, safeLeadGiftAmount);
       setRows(generated);
+      setRemovedTier3Rows([]);
       setNotice('Applied lead gift to a newly generated chart.');
       return;
     }
     const result = updateLeadGiftAndRebalance(rows, safeLeadGiftAmount, safeGoalAmount);
     setRows(result.rows);
+    setRemovedTier3Rows([]);
     setNotice(result.warning ?? null);
   };
 
@@ -143,12 +147,14 @@ export default function GiftChartEditor({ initial }: Props) {
     if (safeGoalAmount <= 0) {
       form.setValue('leadGiftAmount', undefined as unknown as number);
       setRows([]);
+      setRemovedTier3Rows([]);
       setNotice('Reset complete. Enter campaign goal to generate defaults.');
       return;
     }
     const resetLead = defaultLeadGift(safeGoalAmount);
     form.setValue('leadGiftAmount', resetLead, { shouldValidate: true });
     setRows(generateGiftChart(safeGoalAmount, tiersCount, resetLead));
+    setRemovedTier3Rows([]);
     setNotice('Chart reset to default ranges and counts.');
   };
 
@@ -182,11 +188,13 @@ export default function GiftChartEditor({ initial }: Props) {
   const removeTier3Level = () => {
     const current = rows.filter((row) => row.tier === 3);
     if (current.length <= 1) return;
-    const targetId = current[current.length - 1].id;
+    const target = current[current.length - 1];
+    const targetId = target.id;
     const next = rows.filter((row) => row.id !== targetId);
     const normalized = normalizeRanges(renumberTierLevels(next, 3));
     const result = rebalanceGiftChart(normalized, safeGoalAmount);
     setRows(result.rows);
+    setRemovedTier3Rows((prev) => [...prev, target]);
     setNotice('Removed one level from Tier III and rebalanced.');
   };
 
@@ -195,23 +203,26 @@ export default function GiftChartEditor({ initial }: Props) {
     if (current.length >= 3) return;
     if (safeGoalAmount <= 0) return;
 
-    const template = generateGiftChart(
-      safeGoalAmount,
-      tiersCount,
-      isLeadAuto ? defaultLeadGift(safeGoalAmount) : safeLeadGiftAmount
-    ).filter((row) => row.tier === 3);
-
-    const templateRow = template[current.length];
-    if (!templateRow) return;
+    const restored = removedTier3Rows[removedTier3Rows.length - 1];
+    let baseRow: ChartRow | undefined = restored;
+    if (!baseRow) {
+      const template = generateGiftChart(
+        safeGoalAmount,
+        tiersCount,
+        isLeadAuto ? defaultLeadGift(safeGoalAmount) : safeLeadGiftAmount
+      ).filter((row) => row.tier === 3);
+      baseRow = template[current.length];
+    }
+    if (!baseRow) return;
 
     const insertAt = rows.findIndex((row) => row.tier > 3);
     const newRow: ChartRow = {
-      ...templateRow,
+      ...baseRow,
       id: `r-3-${Date.now()}-${current.length + 1}`,
       level: current.length + 1,
       giftCount: Math.max(
         current[current.length - 1]?.giftCount ?? 1,
-        templateRow.giftCount
+        baseRow.giftCount
       )
     };
 
@@ -225,6 +236,9 @@ export default function GiftChartEditor({ initial }: Props) {
     const normalized = normalizeRanges(renumberTierLevels(next, 3));
     const result = rebalanceGiftChart(normalized, safeGoalAmount);
     setRows(result.rows);
+    if (restored) {
+      setRemovedTier3Rows((prev) => prev.slice(0, -1));
+    }
     setNotice('Added one level to Tier III and rebalanced.');
   };
 
