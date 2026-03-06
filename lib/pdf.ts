@@ -1,4 +1,7 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { ChartRow } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 
@@ -163,16 +166,49 @@ const drawSimplifiedTable = (
 
 export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promise<Buffer> {
   const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
   const page = pdf.addPage([792, 612]);
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const titleFont = await pdf.embedFont(StandardFonts.TimesRomanBold);
+  let regular;
+  let bold;
+  try {
+    const regularPath = path.join(
+      process.cwd(),
+      'node_modules',
+      '@fontsource',
+      'carlito',
+      'files',
+      'carlito-latin-400-normal.ttf'
+    );
+    const boldPath = path.join(
+      process.cwd(),
+      'node_modules',
+      '@fontsource',
+      'carlito',
+      'files',
+      'carlito-latin-700-normal.ttf'
+    );
+    const [regularBytes, boldBytes] = await Promise.all([readFile(regularPath), readFile(boldPath)]);
+    regular = await pdf.embedFont(regularBytes);
+    bold = await pdf.embedFont(boldBytes);
+  } catch {
+    regular = await pdf.embedFont(StandardFonts.Helvetica);
+    bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  }
+  const titleFont = bold;
 
   // Layered background for a polished rendered feel.
   page.drawRectangle({ x: 0, y: 0, width: 792, height: 612, color: rgb(0.96, 1, 0.99) });
   page.drawRectangle({ x: 0, y: 500, width: 792, height: 112, color: rgb(0.90, 0.98, 0.96), opacity: 0.65 });
 
-  page.drawText(input.projectName, { x: 40, y: 560, size: 30, font: titleFont, color: BRAND_DARK });
+  const titleY = 560;
+  page.drawText(input.projectName, { x: 40, y: titleY, size: 30, font: titleFont, color: BRAND_DARK });
+  const titleWidth = titleFont.widthOfTextAtSize(input.projectName, 30);
+  page.drawLine({
+    start: { x: 40, y: titleY - 4 },
+    end: { x: 40 + titleWidth, y: titleY - 4 },
+    thickness: 1.5,
+    color: BRAND_DARK
+  });
   page.drawText('Simplified Gift Chart', { x: 40, y: 535, size: 13, font: regular, color: TEXT });
 
   const groups = groupByTier(input.rows);

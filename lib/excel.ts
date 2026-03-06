@@ -30,14 +30,14 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
 
   sheet.mergeCells('A1:F1');
   sheet.getCell('A1').value = `${input.projectName} - Goal ${formatCurrency(input.goalAmount)}`;
-  sheet.getCell('A1').font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 14 };
+  sheet.getCell('A1').font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' }, size: 14 };
   sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brandDark } };
   sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left' };
   sheet.getRow(1).height = 26;
 
   sheet.addRow([]);
   const header = sheet.addRow(['Tier', '# of gifts', 'Gift range', '$ amount', '=', 'Value of gifts at this level']);
-  header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  header.font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' } };
   header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brand } };
   header.alignment = { vertical: 'middle', horizontal: 'center' };
 
@@ -66,14 +66,14 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
     sheet.mergeCells(`A${tierStart}:A${tierStart + tierRows.length - 1}`);
     const tierCell = sheet.getCell(`A${tierStart}`);
     tierCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    tierCell.font = { bold: true, color: { argb: ink } };
+    tierCell.font = { name: 'Calibri', bold: true, color: { argb: ink } };
     tierCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brand } };
 
     const subtotal = tierSubtotal(input.rows, tier);
     const subtotalRow = sheet.addRow(['gifts yielding a total of', '', '', '', '', subtotal]);
     sheet.mergeCells(`A${subtotalRow.number}:E${subtotalRow.number}`);
     subtotalRow.getCell(6).numFmt = '$#,##0';
-    subtotalRow.font = { bold: true };
+    subtotalRow.font = { name: 'Calibri', bold: true };
     subtotalRow.getCell(1).alignment = { horizontal: 'right' };
     subtotalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: subtotalBand } };
     subtotalRow.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: subtotalBand } };
@@ -95,16 +95,21 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
 
   const totalRow = sheet.addRow(['TOTAL GIFTS', '', '', '', '', input.goalAmount]);
   sheet.mergeCells(`A${currentRow}:E${currentRow}`);
-  totalRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  totalRow.getCell(1).font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' } };
   totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brandDark } };
   totalRow.getCell(1).alignment = { horizontal: 'right' };
-  totalRow.getCell(6).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  totalRow.getCell(6).font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' } };
   totalRow.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brandDark } };
   totalRow.getCell(6).numFmt = '$#,##0';
 
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber < 3) return;
     row.eachCell((cell) => {
+      if (!cell.font) {
+        cell.font = { name: 'Calibri', size: 11 };
+      } else if (!cell.font.name) {
+        cell.font = { ...cell.font, name: 'Calibri' };
+      }
       cell.border = {
         top: { style: 'thin', color: { argb: grid } },
         left: { style: 'thin', color: { argb: grid } },
