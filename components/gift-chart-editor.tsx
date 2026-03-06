@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ChartRow } from '@/lib/types';
+import { exportBaseName } from '@/lib/fileName';
 import {
   applyHighRangeOverride,
   buildRangeText,
@@ -312,8 +313,7 @@ export default function GiftChartEditor({ initial }: Props) {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      const safeProject = form.getValues('projectName').replace(/[^a-z0-9-_]/gi, '_');
-      anchor.download = `OneClickGiftChart_${safeProject}_${form.getValues('goalAmount')}.xlsx`;
+      anchor.download = `${exportBaseName(form.getValues('projectName'), Number(form.getValues('goalAmount')))}.xlsx`;
       anchor.click();
       URL.revokeObjectURL(url);
       setNotice('Saved and downloaded workbook.');

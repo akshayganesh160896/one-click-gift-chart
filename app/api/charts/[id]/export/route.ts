@@ -3,6 +3,7 @@ import { ensureAppUser, SYSTEM_USER_ID } from '@/lib/appUser';
 import { prisma } from '@/lib/prisma';
 import { generateGiftChartWorkbook } from '@/lib/excel';
 import { ChartRow } from '@/lib/types';
+import { exportBaseName } from '@/lib/fileName';
 
 type Context = {
   params: { id: string };
@@ -28,8 +29,7 @@ export async function GET(_: Request, { params }: Context) {
     rows: chart.chartJson as unknown as ChartRow[]
   });
 
-  const safeProject = chart.projectName.replace(/[^a-z0-9-_]/gi, '_');
-  const filename = `OneClickGiftChart_${safeProject}_${chart.goalAmount}.xlsx`;
+  const filename = `${exportBaseName(chart.projectName, chart.goalAmount)}.xlsx`;
 
   const bytes = new Uint8Array(buffer);
 
