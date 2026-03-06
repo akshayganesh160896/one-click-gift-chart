@@ -43,13 +43,26 @@ type Props = {
 
 const defaultLeadGift = (goalAmount: number) => Math.max(1, Math.round(goalAmount * 0.2));
 const ONE_MILLION = 1000000;
-const highRangeOptions = (current: number) => {
+const highRangeOptions = (current: number, previousBound: number | null, goalAmount: number) => {
   const options = new Set<number>();
   options.add(current);
-  options.add(Math.max(ONE_MILLION, current - ONE_MILLION));
-  options.add(current + ONE_MILLION);
-  options.add(Math.max(ONE_MILLION, Math.round((current * 2) / 3 / ONE_MILLION) * ONE_MILLION));
-  options.add(Math.max(ONE_MILLION, Math.round((current * 3) / 4 / ONE_MILLION) * ONE_MILLION));
+
+  if (goalAmount >= 200000000 && previousBound && previousBound >= 50000000) {
+    const cleanOptions = [
+      Math.round(previousBound * 0.75 / 10000000) * 10000000,
+      Math.round(previousBound * 0.625 / 5000000) * 5000000,
+      Math.round(previousBound * 0.5 / 10000000) * 10000000
+    ];
+    cleanOptions.forEach((value) => {
+      if (value >= ONE_MILLION && value < previousBound) options.add(value);
+    });
+  } else {
+    options.add(Math.max(ONE_MILLION, current - ONE_MILLION));
+    options.add(current + ONE_MILLION);
+    options.add(Math.max(ONE_MILLION, Math.round((current * 2) / 3 / ONE_MILLION) * ONE_MILLION));
+    options.add(Math.max(ONE_MILLION, Math.round((current * 3) / 4 / ONE_MILLION) * ONE_MILLION));
+  }
+
   return Array.from(options).sort((a, b) => b - a);
 };
 
@@ -582,7 +595,7 @@ export default function GiftChartEditor({ initial }: Props) {
                     value={row.lowerBound}
                     onChange={(event) => handleHighRangeEdit(index, Number(event.target.value))}
                   >
-                    {highRangeOptions(row.lowerBound).map((option) => (
+                    {highRangeOptions(row.lowerBound, rows[index - 1]?.lowerBound ?? null, safeGoalAmount).map((option) => (
                       <option key={option} value={option}>
                         {formatUsd(option)}
                       </option>

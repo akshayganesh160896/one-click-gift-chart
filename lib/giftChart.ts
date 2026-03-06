@@ -60,6 +60,13 @@ const nextBoundFromTail = (previousBound: number, goalAmount: number): number =>
 
 const roundToNearest = (value: number, step: number) => Math.max(step, Math.round(value / step) * step);
 
+const highGoalRoundingStep = (value: number): number => {
+  if (value >= 100000000) return 10000000;
+  if (value >= 50000000) return 5000000;
+  if (value >= 10000000) return 2000000;
+  return ONE_MILLION;
+};
+
 const nextRangeStepDown = (value: number, min = 1000): number => {
   for (const option of RANGE_STEP_OPTIONS) {
     if (option < value && option >= min) {
@@ -132,18 +139,17 @@ const buildLargeCampaignBounds = (lead: number, levelCount: number, goalAmount: 
 
   const high: number[] = [top];
   if (highSlots >= 2) {
-    const secondDefault =
-      top >= 12000000
-        ? Math.floor(((top * 2) / 3) / 2000000) * 2000000
-        : roundToNearest(top / 2, ONE_MILLION);
-    const second = Math.max(2 * ONE_MILLION, Math.min(top - ONE_MILLION, secondDefault));
+    const secondStep = highGoalRoundingStep(top);
+    const secondDefault = roundToNearest(top / 2, secondStep);
+    const second = Math.max(2 * ONE_MILLION, Math.min(top - secondStep, secondDefault));
     high.push(second);
   }
   while (high.length < highSlots) {
     const previous = high[high.length - 1];
-    let next = Math.max(ONE_MILLION, roundToNearest(previous / 2, ONE_MILLION));
+    const step = highGoalRoundingStep(previous);
+    let next = Math.max(ONE_MILLION, roundToNearest(previous / 2, step));
     if (next >= previous) {
-      next = previous - ONE_MILLION;
+      next = previous - step;
     }
     if (next < ONE_MILLION) {
       next = ONE_MILLION;

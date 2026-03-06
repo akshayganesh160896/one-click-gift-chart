@@ -101,6 +101,14 @@ describe('gift chart rebalancing', () => {
     expect(bounds[7]).toBeGreaterThanOrEqual(200000);
   });
 
+  it('uses clean round ranges for very large goals', () => {
+    const rows = generateGiftChart(400000000, 3);
+    const bounds = rows.map((row) => row.lowerBound);
+    expect(bounds[0]).toBe(80000000);
+    expect(bounds[1]).toBe(40000000);
+    expect(bounds[2]).toBe(20000000);
+  });
+
   it('uses the requested 1M lead ladder for major campaigns', () => {
     const rows = generateGiftChart(20000000, 3, 1000000);
     const bounds = rows.map((row) => row.lowerBound);
