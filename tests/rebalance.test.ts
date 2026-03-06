@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateGiftChart, rebalanceGiftChart, rowsTotal } from '@/lib/giftChart';
+import { applySecondLastRangeOverride, generateGiftChart, rebalanceGiftChart, rowsTotal } from '@/lib/giftChart';
 
 describe('gift chart rebalancing', () => {
   it('matches campaign goal exactly for default generation', () => {
@@ -99,5 +99,22 @@ describe('gift chart rebalancing', () => {
     const bounds = rows.map((row) => row.lowerBound);
     expect(bounds[8]).toBeGreaterThanOrEqual(100000);
     expect(bounds[7]).toBeGreaterThanOrEqual(200000);
+  });
+
+  it('uses the requested 1M lead ladder for major campaigns', () => {
+    const rows = generateGiftChart(20000000, 3, 1000000);
+    const bounds = rows.map((row) => row.lowerBound);
+    expect(bounds).toEqual([1000000, 750000, 500000, 250000, 100000, 75000, 50000, 25000, 10000]);
+    expect(rowsTotal(rows)).toBe(20000000);
+  });
+
+  it('lets second-last range drive the final range and preserves exact totals', () => {
+    const goal = 20000000;
+    const rows = generateGiftChart(goal, 3, 1000000);
+    const result = applySecondLastRangeOverride(rows, 10000, goal);
+    const updatedBounds = result.rows.map((row) => row.lowerBound);
+    expect(updatedBounds[7]).toBe(10000);
+    expect(updatedBounds[8]).toBe(5000);
+    expect(rowsTotal(result.rows)).toBe(goal);
   });
 });

@@ -9,10 +9,12 @@ import { z } from 'zod';
 import { ChartRow } from '@/lib/types';
 import { exportBaseName } from '@/lib/fileName';
 import {
+  applySecondLastRangeOverride,
   applyHighRangeOverride,
   buildRangeText,
   formatUsd,
   generateGiftChart,
+  getSecondLastRangeOptions,
   rebalanceGiftChart,
   rowsTotal,
   tierSubtotal,
@@ -94,6 +96,20 @@ export default function GiftChartEditor({ initial }: Props) {
       .filter(({ row, index }) => row.lowerBound >= ONE_MILLION && index !== 0),
     [rows]
   );
+  const secondLastRowMeta = useMemo(() => {
+    if (rows.length < 2) return null;
+    const secondLastIndex = rows.length - 2;
+    const previousBound = rows[secondLastIndex - 1]?.lowerBound ?? Number.MAX_SAFE_INTEGER;
+    const options = getSecondLastRangeOptions(previousBound, 1000);
+    if (!options.includes(rows[secondLastIndex].lowerBound)) {
+      options.unshift(rows[secondLastIndex].lowerBound);
+    }
+    return {
+      row: rows[secondLastIndex],
+      rowIndex: secondLastIndex,
+      options: Array.from(new Set(options)).sort((a, b) => b - a)
+    };
+  }, [rows]);
   const delta = safeGoalAmount - total;
 
   const regenerate = () => {
@@ -162,6 +178,12 @@ export default function GiftChartEditor({ initial }: Props) {
 
   const handleHighRangeEdit = (rowIndex: number, value: number) => {
     const result = applyHighRangeOverride(rows, rowIndex, value, safeGoalAmount);
+    setRows(result.rows);
+    setNotice(result.warning ?? null);
+  };
+
+  const handleSecondLastRangeEdit = (value: number) => {
+    const result = applySecondLastRangeOverride(rows, value, safeGoalAmount);
     setRows(result.rows);
     setNotice(result.warning ?? null);
   };
@@ -568,6 +590,28 @@ export default function GiftChartEditor({ initial }: Props) {
                   </select>
                 </label>
               ))}
+            </div>
+          ) : null}
+          {secondLastRowMeta ? (
+            <div className="space-y-2 rounded-xl border border-slate-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lower Tier Tuning</p>
+              <label className="block text-xs font-medium text-slate-700">
+                Tier {secondLastRowMeta.row.tierLabel} Level {secondLastRowMeta.row.level} lower bound
+                <select
+                  className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                  value={secondLastRowMeta.row.lowerBound}
+                  onChange={(event) => handleSecondLastRangeEdit(Number(event.target.value))}
+                >
+                  {secondLastRowMeta.options.map((option) => (
+                    <option key={option} value={option}>
+                      {formatUsd(option)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-[11px] text-slate-500">
+                The final row auto-updates to the next lower range and rebalances totals.
+              </p>
             </div>
           ) : null}
           <p className={`text-sm ${delta === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>

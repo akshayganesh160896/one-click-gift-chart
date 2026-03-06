@@ -8,6 +8,8 @@ const LARGE_CAMPAIGN_MIN_GOAL = 30000000;
 const MAJOR_FIXED_BOUNDS = [1000000, 500000, 250000, 100000];
 const ONE_MILLION = 1000000;
 const FIXED_BELOW_ONE_MILLION = [500000, 250000, 100000, 50000, 25000, 10000];
+const ONE_MILLION_LEAD_LADDER = [1000000, 750000, 500000, 250000, 100000, 75000, 50000, 25000, 10000];
+const RANGE_STEP_OPTIONS = [750000, 500000, 250000, 100000, 75000, 50000, 25000, 10000, 5000, 1000];
 
 export const rowsTotal = (rows: ChartRow[]) =>
   rows.reduce((sum, row) => sum + row.giftCount * row.lowerBound, 0);
@@ -58,11 +60,42 @@ const nextBoundFromTail = (previousBound: number, goalAmount: number): number =>
 
 const roundToNearest = (value: number, step: number) => Math.max(step, Math.round(value / step) * step);
 
+const nextRangeStepDown = (value: number, min = 1000): number => {
+  for (const option of RANGE_STEP_OPTIONS) {
+    if (option < value && option >= min) {
+      return option;
+    }
+  }
+  return min;
+};
+
+export const getSecondLastRangeOptions = (previousBound: number, min = 1000): number[] =>
+  RANGE_STEP_OPTIONS.filter((option) => option < previousBound && option >= min);
+
 const buildMajorCampaignBounds = (lead: number, levelCount: number): number[] => {
+  if (lead <= ONE_MILLION) {
+    const bounds: number[] = [];
+    for (let i = 0; i < levelCount; i += 1) {
+      const fallback = ONE_MILLION_LEAD_LADDER[ONE_MILLION_LEAD_LADDER.length - 1];
+      bounds.push(ONE_MILLION_LEAD_LADDER[i] ?? fallback);
+    }
+    return bounds;
+  }
+
+  if (lead < 2000000) {
+    const ladder = [lead, 750000, 500000, 250000, 100000, 75000, 50000, 25000, 10000];
+    const bounds: number[] = [];
+    for (let i = 0; i < levelCount; i += 1) {
+      const fallback = ladder[ladder.length - 1];
+      bounds.push(ladder[i] ?? fallback);
+    }
+    return bounds;
+  }
+
   const bounds: number[] = [];
   const cleanTail = [50000, 25000, 10000, 5000, 1000];
   bounds.push(lead);
-  bounds.push(Math.max(2000000, roundToNearest(lead / 2, 50000)));
+  bounds.push(Math.max(1000000, roundToNearest(lead / 2, 50000)));
   bounds.push(MAJOR_FIXED_BOUNDS[0]);
   bounds.push(MAJOR_FIXED_BOUNDS[1]);
   bounds.push(MAJOR_FIXED_BOUNDS[2]);
@@ -177,6 +210,34 @@ export const applyHighRangeOverride = (
   if (tailStart < rows.length) {
     applyFixedTailBelowOneMillion(rows, tailStart, goalAmount);
   }
+
+  for (let i = 1; i < rows.length; i += 1) {
+    rows[i].upperBound = rows[i - 1].lowerBound - 1;
+  }
+  rows[0].upperBound = null;
+
+  return rebalanceGiftChart(rows, goalAmount);
+};
+
+export const applySecondLastRangeOverride = (
+  inputRows: ChartRow[],
+  secondLastLowerBound: number,
+  goalAmount: number
+): RebalanceResult => {
+  if (inputRows.length < 2) {
+    return rebalanceGiftChart(inputRows, goalAmount);
+  }
+
+  const rows = cloneRows(inputRows);
+  const secondLastIndex = rows.length - 2;
+  const lastIndex = rows.length - 1;
+  const maxAllowed = rows[secondLastIndex - 1]?.lowerBound
+    ? rows[secondLastIndex - 1].lowerBound - 1
+    : Number.MAX_SAFE_INTEGER;
+  const normalizedSecondLast = Math.max(1000, Math.min(maxAllowed, secondLastLowerBound));
+
+  rows[secondLastIndex].lowerBound = normalizedSecondLast;
+  rows[lastIndex].lowerBound = nextRangeStepDown(normalizedSecondLast, 1000);
 
   for (let i = 1; i < rows.length; i += 1) {
     rows[i].upperBound = rows[i - 1].lowerBound - 1;
