@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ensureAppUser, SYSTEM_USER_ID } from '@/lib/appUser';
+import { isValidDeletePassword } from '@/lib/deleteAuth';
 import { prisma } from '@/lib/prisma';
 import { chartSchema } from '@/lib/validation';
 import { rowsTotal } from '@/lib/giftChart';
@@ -45,4 +46,19 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json(chart, { status: 201 });
+}
+
+export async function DELETE(request: Request) {
+  await ensureAppUser();
+
+  const body = await request.json().catch(() => ({}));
+  if (!isValidDeletePassword(body?.password)) {
+    return NextResponse.json({ error: 'Invalid password' }, { status: 403 });
+  }
+
+  await prisma.giftChart.deleteMany({
+    where: { userId: SYSTEM_USER_ID }
+  });
+
+  return NextResponse.json({ ok: true });
 }

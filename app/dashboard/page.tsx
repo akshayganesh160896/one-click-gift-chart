@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ensureAppUser, SYSTEM_USER_ID } from '@/lib/appUser';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/currency';
+import { ClearAllChartsButton, DeleteChartButton } from '@/components/dashboard-delete-buttons';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,10 @@ export default async function DashboardPage() {
       </Link>
 
       <section className="rounded-2xl bg-white p-6 shadow-soft">
-        <h2 className="mb-4 text-lg font-semibold">Your charts</h2>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Your charts</h2>
+          <ClearAllChartsButton disabled={charts.length === 0} />
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -43,6 +47,7 @@ export default async function DashboardPage() {
                 <th className="px-3 py-2">Goal</th>
                 <th className="px-3 py-2">Created</th>
                 <th className="px-3 py-2">Updated</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -56,6 +61,9 @@ export default async function DashboardPage() {
                   <td className="px-3 py-3">{formatCurrency(chart.goalAmount)}</td>
                   <td className="px-3 py-3">{new Date(chart.createdAt).toLocaleString()}</td>
                   <td className="px-3 py-3">{new Date(chart.updatedAt).toLocaleString()}</td>
+                  <td className="px-3 py-3 text-right">
+                    <DeleteChartButton chartId={chart.id} projectName={chart.projectName} />
+                  </td>
                 </tr>
               ))}
             </tbody>
