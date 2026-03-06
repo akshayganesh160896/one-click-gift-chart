@@ -218,7 +218,16 @@ export async function generateSimplifiedGiftChartPdf(input: ExportInput): Promis
   drawSimplifiedTable(page, groups, 'Campaign Gift Ranges', rangeText, 40, topY, tableWidth, regular, bold);
   drawSimplifiedTable(page, groups, 'Sample Annual Payments (over 5 years)', annualRangeText, 422, topY, tableWidth, regular, bold);
 
-  // Simple clear arrow between tables.
+  // Traditional vector arrow centered in the gap between tables.
+  page.drawSvgPath('M 0 8 L 18 8 L 18 0 L 32 12 L 18 24 L 18 16 L 0 16 Z', {
+    x: 380,
+    y: 328,
+    color: BRAND_DARK,
+    borderColor: BORDER,
+    borderWidth: 0.8,
+    opacity: 1
+  });
+
   const bytes = await pdf.save();
   return Buffer.from(bytes);
 }

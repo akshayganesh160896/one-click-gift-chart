@@ -12,6 +12,7 @@ type ExportInput = {
 export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Gift Chart');
+  sheet.views = [{ showGridLines: false }];
   const brand = 'FF40C1AC';
   const brandDark = 'FF2A9D8B';
   const ink = 'FF0F172A';
@@ -30,7 +31,7 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
 
   sheet.mergeCells('A1:F1');
   sheet.getCell('A1').value = `${input.projectName} - Goal ${formatCurrency(input.goalAmount)}`;
-  sheet.getCell('A1').font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' }, size: 14 };
+  sheet.getCell('A1').font = { name: 'Georgio', bold: true, color: { argb: 'FFFFFFFF' }, size: 14 };
   sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brandDark } };
   sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left' };
   sheet.getRow(1).height = 26;
@@ -43,6 +44,7 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
 
   let currentRow = 4;
   const tiers = Array.from(new Set(input.rows.map((r) => r.tier)));
+  const subtotalRowNumbers: number[] = [];
 
   for (const tier of tiers) {
     const tierRows = input.rows.filter((row) => row.tier === tier);
@@ -55,7 +57,7 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
         buildRangeText(row),
         row.lowerBound,
         '=',
-        row.giftCount * row.lowerBound
+        { formula: `B${currentRow}*D${currentRow}` }
       ]);
       excelRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tierBand } };
       excelRow.getCell(4).numFmt = '$#,##0';
@@ -70,7 +72,15 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
     tierCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brand } };
 
     const subtotal = tierSubtotal(input.rows, tier);
-    const subtotalRow = sheet.addRow(['gifts yielding a total of', '', '', '', '', subtotal]);
+    const subtotalRow = sheet.addRow([
+      'gifts yielding a total of',
+      '',
+      '',
+      '',
+      '',
+      { formula: `SUM(F${tierStart}:F${tierStart + tierRows.length - 1})`, result: subtotal }
+    ]);
+    subtotalRowNumbers.push(subtotalRow.number);
     sheet.mergeCells(`A${subtotalRow.number}:E${subtotalRow.number}`);
     subtotalRow.getCell(6).numFmt = '$#,##0';
     subtotalRow.font = { name: 'Calibri', bold: true };
@@ -93,7 +103,18 @@ export async function generateGiftChartWorkbook(input: ExportInput): Promise<Buf
     currentRow += 1;
   }
 
-  const totalRow = sheet.addRow(['TOTAL GIFTS', '', '', '', '', input.goalAmount]);
+  const totalFormula =
+    subtotalRowNumbers.length > 0
+      ? subtotalRowNumbers.map((rowNumber) => `F${rowNumber}`).join('+')
+      : '0';
+  const totalRow = sheet.addRow([
+    'TOTAL GIFTS',
+    '',
+    '',
+    '',
+    '',
+    { formula: totalFormula, result: input.goalAmount }
+  ]);
   sheet.mergeCells(`A${currentRow}:E${currentRow}`);
   totalRow.getCell(1).font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' } };
   totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: brandDark } };
