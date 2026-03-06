@@ -8,11 +8,25 @@ describe('gift chart rebalancing', () => {
     expect(rowsTotal(rows)).toBe(goal);
   });
 
-  it('stays exact after manual count edit + rebalance', () => {
+  it('stays exact after a manual count edit + rebalance', () => {
     const goal = 2500000;
     const rows = generateGiftChart(goal, 3);
-    rows[3].giftCount = 20;
+    rows[3].giftCount = 8;
     const result = rebalanceGiftChart(rows, goal, [3]);
+    expect(rowsTotal(result.rows)).toBe(goal);
+  });
+
+  it('keeps the lowest gift range fixed when second-last count is edited', () => {
+    const goal = 20000000;
+    const rows = generateGiftChart(goal, 3, 1000000);
+    const lastIndex = rows.length - 1;
+    const secondLastIndex = lastIndex - 1;
+    const originalLastLowerBound = rows[lastIndex].lowerBound;
+
+    rows[secondLastIndex].giftCount += 2;
+    const result = rebalanceGiftChart(rows, goal, [secondLastIndex]);
+
+    expect(result.rows[lastIndex].lowerBound).toBe(originalLastLowerBound);
     expect(rowsTotal(result.rows)).toBe(goal);
   });
 

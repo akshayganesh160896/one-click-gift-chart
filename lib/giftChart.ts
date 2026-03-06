@@ -28,11 +28,6 @@ export const formatUsd = (value: number): string =>
     maximumFractionDigits: 0
   }).format(value);
 
-const orderedStepCandidates = (max: number, min = 1): number[] => {
-  const steps = [250000, 100000, 75000, 50000, 25000, 10000, 5000, 1000, 500, 100, 50, 10, 5, 1];
-  return steps.filter((step) => step <= max && step >= min);
-};
-
 const chooseTailPattern = (goalAmount: number) => {
   if (goalAmount >= 5000000) {
     return [100000, 75000, 50000, 25000, 10000];
@@ -371,61 +366,53 @@ const buildLowerBounds = (lead: number, levelCount: number, goalAmount: number):
   return bounds;
 };
 
-const findExactLastAllocation = (
-  remaining: number,
-  minCount: number,
-  maxLowerBound: number,
-  minLowerBound: number
-): { count: number; lowerBound: number } => {
-  if (remaining <= 0) {
-    return { count: minCount, lowerBound: minLowerBound };
-  }
-
-  for (const step of orderedStepCandidates(maxLowerBound, minLowerBound)) {
-    if (remaining % step === 0) {
-      const count = remaining / step;
-      if (count >= minCount) {
-        return { count, lowerBound: step };
-      }
-    }
-  }
-
-  // When no exact fit exists at normal denomination steps, we relax to the
-  // configured floor (10k for major templates, $1 otherwise).
-  const safeCount = Math.max(minCount, remaining);
-  const safeLower = Math.max(minLowerBound, Math.floor(remaining / safeCount));
-  const correctedCount = Math.max(minCount, Math.floor(remaining / safeLower));
-  return {
-    count: correctedCount,
-    lowerBound: Math.max(minLowerBound, Math.floor(remaining / correctedCount))
-  };
-};
-
 const cloneRows = (rows: ChartRow[]) => rows.map((row) => ({ ...row }));
-const forceExactWithDollarFloor = (rows: ChartRow[], goalAmount: number, lastIndex: number) => {
-  const subtotalWithoutLast = rows
-    .slice(0, lastIndex)
-    .reduce((sum, row) => sum + row.giftCount * row.lowerBound, 0);
-  rows[lastIndex].lowerBound = 1;
-  rows[lastIndex].giftCount = Math.max(1, goalAmount - subtotalWithoutLast);
-};
 
 const solveLastTwoCountsExact = (
   remaining: number,
   secondLastBound: number,
   lastBound: number,
   secondLastMin: number,
-  secondLastMax: number
+  secondLastMax: number,
+  options?: {
+    enforceDoubleMax?: boolean;
+    lockedSecondLastCount?: number;
+    lockedLastCount?: number;
+    currentSecondLastCount?: number;
+    currentLastCount?: number;
+  }
 ): { secondLastCount: number; lastCount: number } | null => {
+  let best: { secondLastCount: number; lastCount: number } | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
   for (let secondLastCount = secondLastMin; secondLastCount <= secondLastMax; secondLastCount += 1) {
+    if (
+      typeof options?.lockedSecondLastCount === 'number' &&
+      secondLastCount !== options.lockedSecondLastCount
+    ) {
+      continue;
+    }
     const rem = remaining - secondLastCount * secondLastBound;
     if (rem < 0 || rem % lastBound !== 0) continue;
     const lastCount = rem / lastBound;
-    if (lastCount >= secondLastCount && lastCount <= secondLastCount * 2) {
-      return { secondLastCount, lastCount };
+    if (lastCount < secondLastCount) continue;
+    if (options?.enforceDoubleMax && lastCount > secondLastCount * 2) continue;
+    if (typeof options?.lockedLastCount === 'number' && lastCount !== options.lockedLastCount) continue;
+
+    const currentSecondLast = options?.currentSecondLastCount ?? secondLastCount;
+    const currentLast = options?.currentLastCount ?? lastCount;
+    const score =
+      Math.abs(secondLastCount - currentSecondLast) +
+      Math.abs(lastCount - currentLast) +
+      (secondLastCount % 2 === 0 ? 0 : 0.2) +
+      (lastCount % 2 === 0 ? 0 : 0.2);
+
+    if (score < bestScore) {
+      bestScore = score;
+      best = { secondLastCount, lastCount };
     }
   }
-  return null;
+  return best;
 };
 
 export const generateGiftChart = (goalAmount: number, tiersCount: 3 | 4, leadGiftAmount?: number): ChartRow[] => {
@@ -477,7 +464,6 @@ export const rebalanceGiftChart = (
   const locked = new Set(lockedIndices);
   let warning: string | undefined;
   const isMajorCampaign = goalAmount >= MAJOR_CAMPAIGN_MIN_GOAL && rows.length >= 9;
-  const minLowerBound = isMajorCampaign ? 10000 : 1;
 
   if (isMajorCampaign && lockedIndices.length === 0) {
     const solvedCounts = solveMajorCampaignCounts(rows, goalAmount);
@@ -536,17 +522,11 @@ export const rebalanceGiftChart = (
 
   if (remaining <= 0) {
     rows[lastIndex].giftCount = minLastCount;
-    rows[lastIndex].lowerBound = isMajorCampaign
-      ? rows[lastIndex].lowerBound
-      : Math.max(minLowerBound, rows[lastIndex].lowerBound);
   } else {
     if (isMajorCampaign) {
       rows[lastIndex].giftCount = Math.max(minLastCount, Math.floor(remaining / rows[lastIndex].lowerBound));
     } else {
-      const maxLowerBound = Math.max(1, rows[lastIndex - 1]?.lowerBound ?? rows[lastIndex].lowerBound);
-      const allocation = findExactLastAllocation(remaining, minLastCount, maxLowerBound, minLowerBound);
-      rows[lastIndex].giftCount = allocation.count;
-      rows[lastIndex].lowerBound = allocation.lowerBound;
+      rows[lastIndex].giftCount = Math.max(minLastCount, Math.floor(remaining / rows[lastIndex].lowerBound));
     }
   }
 
@@ -555,38 +535,55 @@ export const rebalanceGiftChart = (
   }
   rows[0].upperBound = null;
 
-  if (isMajorCampaign && rows.length >= 2) {
+  if (rows.length >= 2) {
     const secondLastIndex = lastIndex - 1;
+    const secondLastPrevious = rows[secondLastIndex - 1]?.giftCount ?? 1;
+    const lockedSecondLastCount = locked.has(secondLastIndex) ? rows[secondLastIndex].giftCount : undefined;
+    const lockedLastCount = locked.has(lastIndex) ? rows[lastIndex].giftCount : undefined;
     const subtotalWithoutLastTwo = rows
       .slice(0, secondLastIndex)
       .reduce((sum, row) => sum + row.giftCount * row.lowerBound, 0);
+    const secondLastMaxByRemaining = Math.max(
+      rows[secondLastIndex].giftCount,
+      Math.floor((goalAmount - subtotalWithoutLastTwo) / rows[secondLastIndex].lowerBound)
+    );
+    const secondLastMin = lockedSecondLastCount ?? secondLastPrevious;
+    const secondLastMax = lockedSecondLastCount
+      ? lockedSecondLastCount
+      : isMajorCampaign
+        ? Math.min(secondLastMaxByRemaining, secondLastPrevious * 2)
+        : secondLastMaxByRemaining;
+
     const exact = solveLastTwoCountsExact(
       goalAmount - subtotalWithoutLastTwo,
       rows[secondLastIndex].lowerBound,
       rows[lastIndex].lowerBound,
-      rows[secondLastIndex - 1]?.giftCount ?? 1,
-      (rows[secondLastIndex - 1]?.giftCount ?? 1) * 2
+      secondLastMin,
+      Math.max(secondLastMin, secondLastMax),
+      {
+        enforceDoubleMax: isMajorCampaign,
+        lockedSecondLastCount,
+        lockedLastCount,
+        currentSecondLastCount: rows[secondLastIndex].giftCount,
+        currentLastCount: rows[lastIndex].giftCount
+      }
     );
     if (exact) {
       rows[secondLastIndex].giftCount = exact.secondLastCount;
       rows[lastIndex].giftCount = exact.lastCount;
-    }
-  } else {
-    const finalTotal = rowsTotal(rows);
-    if (finalTotal !== goalAmount) {
+    } else {
+      const finalTotal = rowsTotal(rows);
       const diff = goalAmount - finalTotal;
       if (diff % rows[lastIndex].lowerBound === 0) {
-        rows[lastIndex].giftCount += diff / rows[lastIndex].lowerBound;
+        const nextLastCount = rows[lastIndex].giftCount + diff / rows[lastIndex].lowerBound;
+        if (nextLastCount >= rows[secondLastIndex].giftCount) {
+          rows[lastIndex].giftCount = nextLastCount;
+        } else {
+          warning = 'Could not perfectly rebalance with fixed ranges while preserving count rules.';
+        }
       } else {
-        forceExactWithDollarFloor(rows, goalAmount, lastIndex);
+        warning = 'Could not perfectly rebalance with fixed ranges while preserving count rules.';
       }
-    }
-  }
-
-  const safeTotal = rowsTotal(rows);
-  if (safeTotal !== goalAmount) {
-    if (!isMajorCampaign) {
-      forceExactWithDollarFloor(rows, goalAmount, lastIndex);
     }
   }
 
