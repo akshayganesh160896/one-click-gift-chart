@@ -37,6 +37,12 @@ describe('gift chart rebalancing', () => {
     expect(rowsTotal(rows)).toBe(goal);
   });
 
+  it('keeps valid fourth-tier ranges for 100M+ four-tier charts', () => {
+    const rows = generateGiftChart(100000000, 4);
+    const bounds = rows.map((row) => row.lowerBound);
+    expect(bounds.slice(9, 12)).toEqual([50000, 25000, 10000]);
+  });
+
   it('uses approved post-250k range ladders', () => {
     const highGoalRows = generateGiftChart(10000000, 4);
     const highBounds = highGoalRows.map((row) => row.lowerBound);

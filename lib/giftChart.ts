@@ -116,8 +116,9 @@ const buildMajorCampaignBounds = (lead: number, levelCount: number): number[] =>
   return bounds.slice(0, levelCount);
 };
 
-const lowerTierFloorForGoal = (goalAmount: number) => {
+const lowerTierFloorForGoal = (goalAmount: number, levelCount: number) => {
   // Keep lower tiers intentionally higher on very large campaigns to reduce gift count volume.
+  if (levelCount >= 12) return 10000;
   if (goalAmount >= 100000000) return 100000;
   if (goalAmount >= 60000000) return 50000;
   return 25000;
@@ -125,7 +126,7 @@ const lowerTierFloorForGoal = (goalAmount: number) => {
 
 const buildLargeCampaignBounds = (lead: number, levelCount: number, goalAmount: number): number[] => {
   const bounds: number[] = [];
-  const floor = lowerTierFloorForGoal(goalAmount);
+  const floor = lowerTierFloorForGoal(goalAmount, levelCount);
   const fixedTail = FIXED_BELOW_ONE_MILLION.filter((value) => value >= floor);
 
   const top = Math.max(ONE_MILLION, roundToNearest(lead, ONE_MILLION));
@@ -167,7 +168,7 @@ const buildLargeCampaignBounds = (lead: number, levelCount: number, goalAmount: 
 };
 
 const applyFixedTailBelowOneMillion = (rows: ChartRow[], startIndex: number, goalAmount: number) => {
-  const floor = lowerTierFloorForGoal(goalAmount);
+  const floor = lowerTierFloorForGoal(goalAmount, rows.length);
   const fixedTail = FIXED_BELOW_ONE_MILLION.filter((value) => value >= floor);
   let tailCursor = 0;
 
